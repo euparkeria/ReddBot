@@ -3,13 +3,14 @@ __author__ = 'mekoneko'
 import time
 import praw
 import json
+import requests
 from twython import Twython
 
 watched_subreddit = 'all'
-results_limit = 100
+results_limit = 200
 results_limit_comm = 1000
 bot_agent_name = 'reddit topic crawler v0.7'
-loop_timer = 20
+loop_timer = 45
 buffer_reset_lenght = 8000
 DEBUG_LEVEL = 1
 
@@ -37,34 +38,35 @@ class ReddBot:
         self.first_run = True
         self.cont_num = {'comments': 0, 'submissions': 0}
         self.already_done = {'comments': [], 'submissions': []}
-        self.loops = ['submissions', 'comments'] # 'submissions' and 'comments' loops
+        self.loops = ['submissions'] # 'submissions' and 'comments' loops
         self.permcounters = {'comments': 0, 'submissions': 0}
 
         self.reddit_session = self.connect_to_reddit(username, password, useragent)
 
         while True:
-            self.cont_num['submissions'] = 0
-            self.cont_num['comments'] = 0
+            try:
+                self.cont_num['submissions'] = 0
+                self.cont_num['comments'] = 0
 
-            for loop in self.loops:
-                self.contentloop(target=loop)
-                if len(self.already_done['comments']) >= buffer_reset_lenght:
-                    self.already_done[loop] = self.already_done[loop][int(len(self.already_done[loop])/2):]
-                    self.debug('DEBUG:buffers LENGHT after trim {0},{1}'.format(len(self.already_done[loop]), len(self.already_done[loop])), DEBUG_LEVEL)
-                if not self.first_run:
-                    self.pulllimit[loop] = self.calculatepulllimit(self.cont_num[loop], target=loop)
-                self.permcounters[loop] += self.cont_num[loop]
+                for loop in self.loops:
+                    self.contentloop(target=loop)
+                    if len(self.already_done[loop]) >= buffer_reset_lenght:
+                        self.already_done[loop] = self.already_done[loop][int(len(self.already_done[loop])/2):]
+                        self.debug('DEBUG:buffers LENGHT after trim {0}'.format(len(self.already_done[loop])), DEBUG_LEVEL)
+                    if not self.first_run:
+                        self.pulllimit[loop] = self.calculatepulllimit(self.cont_num[loop], target=loop)
+                    self.permcounters[loop] += self.cont_num[loop]
 
+                self.debug('Running for :{0} secs. Submissions so far: {1}, THIS run: {2}.Comments so  far:{3}, THIS run:{4}'
+                      .format(int((time.time() - start_time)), self.permcounters['submissions'], self.cont_num['submissions'],
+                            self.permcounters['comments'], self.cont_num['comments']), DEBUG_LEVEL)
 
-            self.debug('Running for :{0} secs. Submissions so far: {1}, THIS run: {2}.Comments so  far:{3}, THIS run:{4}'
-                  .format(int((time.time() - start_time)), self.permcounters['submissions'], self.cont_num['submissions'],
-                        self.permcounters['comments'], self.cont_num['comments']), DEBUG_LEVEL)
+                self.first_run = False
 
-            self.first_run = False
-
-            self.debug(self.pulllimit['submissions'], DEBUG_LEVEL)
-            self.debug(self.pulllimit['comments'], DEBUG_LEVEL)
-
+                self.debug(self.pulllimit['submissions'], DEBUG_LEVEL)
+                self.debug(self.pulllimit['comments'], DEBUG_LEVEL)
+            except:
+                print('HTTP Error')
             time.sleep(loop_timer)
 
     def calculatepulllimit(self, lastpullnum, target):
@@ -106,26 +108,6 @@ class ReddBot:
 
     def mastermanipulator(self, target):
 
-        def downvotemoronic(dsubmission):
-            for subs in ReddData['MORONIC_SUBREDDITS']:
-                if subs == str(dsubmission.subreddit):
-                    dsubmission.downvote()
-                    return 'Downvote in:{0}, {1}'.format(dsubmission.subreddit, dsubmission.id)
-            return False
-
-        def downvotemorons(dsubmission):
-            for moron in ReddData['MORONIC_REDDITORS']:
-                if moron == str(dsubmission.author):
-                    dsubmission.downvote()
-                    return 'A Redditor DOWNVOTED:{0}, {1}'.format(str(dsubmission.author), dsubmission.id)
-            return False
-
-        def upvoteredditor(dsubmission):
-            for redditor in ReddData['UPVOTE_REDDITORS']:
-                if redditor == str(dsubmission.author):
-                    dsubmission.upvote()
-                    return 'A redditor UPVOTED:{0}'.format(str(dsubmission.author))
-            return False
 
         def topicmessanger(dsubmission):
             if target == 'submissions':
@@ -147,7 +129,7 @@ class ReddBot:
             return False
 
         '''
-        IF YOU WANT TO DISABLE A BOT FEATURE for a specific loop REMOVE IT FROM THE TUPLE BELLOW
+        IF YOU WANT TO DISABLE A BOT FEATURE for a specific loop REMOVE IT FROM THE LIST BELLOW
         '''
         if target == 'comments':
             return [topicmessanger, nothing]
