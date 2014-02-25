@@ -17,6 +17,8 @@ DEBUG_LEVEL = 1
 
 with open('ReddDATA.json', 'r', encoding='utf-8') as f:
     ReddData = json.load(f)
+    ReddData['KEYWORDS'] = sorted(ReddData['KEYWORDS'], key=len, reverse=True)
+    print(ReddData['KEYWORDS'])
 
 with open('ReddAUTH.json', 'r', encoding='utf-8') as f:
     BotAuthInfo = json.load(f)
@@ -108,7 +110,6 @@ class ReddBot:
 
     def mastermanipulator(self, target):
 
-
         def topicmessanger(dsubmission):
             if target == 'submissions':
                 op_text = dsubmission.title.lower() + dsubmission.selftext.lower()
@@ -121,7 +122,7 @@ class ReddBot:
                     else:
                         msg = 'Submission concerning #{0} posted in /r/{1} : {2} #reddit'.format(item, dsubmission.subreddit, dsubmission.short_link)
                     #self.reddit_session.send_message(BotAuthInfo['REDDIT_PM_TO'], 'New {0} discussion!'.format(item), msg)
-                    twitter.update_status(status=msg)
+                    #twitter.update_status(status=msg)
                     return 'New Topic match in:{}'.format(dsubmission.subreddit)
             return False
 
