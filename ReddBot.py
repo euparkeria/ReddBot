@@ -122,7 +122,7 @@ class ReddBot:
                     else:
                         msg = 'Submission concerning #{0} posted in /r/{1} : {2} #reddit'.format(item, dsubmission.subreddit, dsubmission.short_link)
                     #self.reddit_session.send_message(BotAuthInfo['REDDIT_PM_TO'], 'New {0} discussion!'.format(item), msg)
-                    #twitter.update_status(status=msg)
+                    twitter.update_status(status=msg)
                     return 'New Topic match in:{}'.format(dsubmission.subreddit)
             return False
 
