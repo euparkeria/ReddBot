@@ -130,7 +130,7 @@ class ReddBot:
                         #self.reddit_session.send_message(BotAuthInfo['REDDIT_PM_TO'], 'New {0} discussion!'.format(item), msg)
                         twitter.update_status(status=msg)
 
-                    return 'New Topic match in:{}'.format(dsubmission.subreddit)
+                    return 'New Topic match in:{0}, keyword:{1}'.format(dsubmission.subreddit, item)
             return False
 
         def nothing(nothing):
