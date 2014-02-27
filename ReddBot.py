@@ -3,7 +3,7 @@ __author__ = 'mekoneko'
 import time
 import praw
 import json
-import requests
+
 from twython import Twython
 
 watched_subreddit = 'all'
@@ -120,9 +120,16 @@ class ReddBot:
                     if target == 'comments':
                         msg = 'Comment concerning #{0} posted in /r/{1} : {2} #reddit'.format(item, dsubmission.subreddit, dsubmission.permalink)
                     else:
-                        msg = 'Submission concerning #{0} posted in /r/{1} : {2} #reddit'.format(item, dsubmission.subreddit, dsubmission.short_link)
-                    #self.reddit_session.send_message(BotAuthInfo['REDDIT_PM_TO'], 'New {0} discussion!'.format(item), msg)
-                    twitter.update_status(status=msg)
+                        if dsubmission.subreddit in ReddData['SRSs']:
+                            msg = 'ATTENTION: possible reactionary brigade from /r/{1} regarding #{0}: {2} #reddit'.format(item, dsubmission.subreddit, dsubmission.short_link)
+                        else:
+                            msg = 'Submission regarding #{0} posted in /r/{1} : {2} #reddit'.format(item, dsubmission.subreddit, dsubmission.short_link)
+                    if len(msg) > 140:
+                        self.debug('MSG exceeding 140 characters!! Dropping!')
+                    else:
+                        #self.reddit_session.send_message(BotAuthInfo['REDDIT_PM_TO'], 'New {0} discussion!'.format(item), msg)
+                        twitter.update_status(status=msg)
+
                     return 'New Topic match in:{}'.format(dsubmission.subreddit)
             return False
 
