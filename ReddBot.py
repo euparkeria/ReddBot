@@ -7,11 +7,11 @@ import json
 from twython import Twython
 
 watched_subreddit = 'all'
-results_limit = 2000
+results_limit = 200
 results_limit_comm = 1000
 bot_agent_name = 'reddit topic crawler v0.7'
-loop_timer = 45
-buffer_reset_lenght = 8000
+loop_timer = 60
+buffer_reset_lenght = 4000
 DEBUG_LEVEL = 1
 
 
@@ -76,18 +76,16 @@ class ReddBot:
 
     def calculatepulllimit(self, lastpullnum, target):
         """this needs to be done better"""
-        if target == 'submissions':
-            add_more = 80
-        elif target == 'comments':
-            add_more = 300
-        if lastpullnum == 0:
+        add_more = {'submissions': 80, 'comments': 300} #how many items above last pull number to pull next run
+
+        if not lastpullnum:
             lastpullnum = self.pulllimit[target] - 1 #in case no new results are returned
 
         res_diff = self.pulllimit[target] - lastpullnum
         if res_diff == 0:
             self.pulllimit[target] *= 2
         else:
-            self.pulllimit[target] = lastpullnum + add_more
+            self.pulllimit[target] = lastpullnum + add_more[target]
         return int(self.pulllimit[target])
 
     def contentloop(self, target):
@@ -114,12 +112,13 @@ class ReddBot:
     def mastermanipulator(self, target):
 
         def topicmessanger(dsubmission):
+
             if target == 'submissions':
-                op_text = dsubmission.title.lower() + dsubmission.selftext.lower()
+                op_text = dsubmission.title + dsubmission.selftext
             else:
-                op_text = dsubmission.body.lower()
+                op_text = dsubmission.body
             for item in ReddData['KEYWORDS']:
-                if item.lower() in op_text:
+                if item.lower() in op_text.lower():
                     if target == 'comments':
                         msg = 'Comment concerning #{0} posted in /r/{1} : {2} #reddit'.format(item, dsubmission.subreddit, dsubmission.permalink)
                     else:
@@ -141,12 +140,10 @@ class ReddBot:
             return False
 
         '''
-        IF YOU WANT TO DISABLE A BOT FEATURE for a specific loop REMOVE IT FROM THE LIST BELLOW
+        IF YOU WANT TO DISABLE A BOT FEATURE for a specific loop REMOVE IT FROM THE DICTIONARY BELLOW
         '''
-        if target == 'comments':
-            return [topicmessanger, nothing]
-        if target == 'submissions':
-            return [topicmessanger, nothing]
+        returnfunctions = {'comments': [topicmessanger, nothing], 'submissions': [topicmessanger, nothing]}
+        return returnfunctions[target]
 
 start_time = time.time()
 bot1 = ReddBot(BotAuthInfo['REDDIT_BOT_USERNAME'], BotAuthInfo['REDDIT_BOT_PASSWORD'], bot_agent_name)
