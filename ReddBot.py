@@ -7,7 +7,7 @@ import json
 from twython import Twython
 
 watched_subreddit = 'all'
-results_limit = 200
+results_limit = 2000
 results_limit_comm = 1000
 bot_agent_name = 'reddit topic crawler v0.7'
 loop_timer = 45
@@ -123,7 +123,8 @@ class ReddBot:
                     if target == 'comments':
                         msg = 'Comment concerning #{0} posted in /r/{1} : {2} #reddit'.format(item, dsubmission.subreddit, dsubmission.permalink)
                     else:
-                        if dsubmission.subreddit.lower() in ReddData['SRSs']:
+                        subreddit = str(dsubmission.subreddit)
+                        if subreddit.lower() in ReddData['SRSs']:
                             msg = 'ATTENTION: possible reactionary brigade from /r/{1} regarding #{0}: {2} #reddit'.format(item, dsubmission.subreddit, dsubmission.short_link)
                         else:
                             msg = 'Submission regarding #{0} posted in /r/{1} : {2} #reddit'.format(item, dsubmission.subreddit, dsubmission.short_link)
