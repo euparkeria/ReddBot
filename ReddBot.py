@@ -18,7 +18,10 @@ DEBUG_LEVEL = 1
 with open('ReddDATA.json', 'r', encoding='utf-8') as f:
     ReddData = json.load(f)
     ReddData['KEYWORDS'] = sorted(ReddData['KEYWORDS'], key=len, reverse=True)
+    ReddData['SRSs'] = [x.lower() for x in ReddData['SRSs']]
     print(ReddData['KEYWORDS'])
+    print(ReddData['SRSs'])
+
 
 with open('ReddAUTH.json', 'r', encoding='utf-8') as f:
     BotAuthInfo = json.load(f)
@@ -120,7 +123,7 @@ class ReddBot:
                     if target == 'comments':
                         msg = 'Comment concerning #{0} posted in /r/{1} : {2} #reddit'.format(item, dsubmission.subreddit, dsubmission.permalink)
                     else:
-                        if dsubmission.subreddit in ReddData['SRSs']:
+                        if dsubmission.subreddit.lower() in ReddData['SRSs']:
                             msg = 'ATTENTION: possible reactionary brigade from /r/{1} regarding #{0}: {2} #reddit'.format(item, dsubmission.subreddit, dsubmission.short_link)
                         else:
                             msg = 'Submission regarding #{0} posted in /r/{1} : {2} #reddit'.format(item, dsubmission.subreddit, dsubmission.short_link)
