@@ -9,44 +9,42 @@ from twython import Twython
 watched_subreddit = 'all'
 results_limit = 200
 results_limit_comm = 1000
-bot_agent_name = 'reddit topic crawler v0.7'
+bot_agent_name = 'reddit topic crawler v0.8'
 loop_timer = 60
 buffer_reset_lenght = 4000
 DEBUG_LEVEL = 1
 
 
-with open('ReddDATA.json', 'r', encoding='utf-8') as f:
-    ReddData = json.load(f)
-    ReddData['KEYWORDS'] = sorted(ReddData['KEYWORDS'], key=len, reverse=True)
-    ReddData['SRSs'] = [x.lower() for x in ReddData['SRSs']]
-    print(ReddData['KEYWORDS'])
-    print(ReddData['SRSs'])
-
-
-with open('ReddAUTH.json', 'r', encoding='utf-8') as f:
-    BotAuthInfo = json.load(f)
-
-
-twitter = Twython(BotAuthInfo['APP_KEY'], BotAuthInfo['APP_SECRET'],
-                  BotAuthInfo['OAUTH_TOKEN'], BotAuthInfo['OAUTH_TOKEN_SECRET'])
-
-
 class ReddBot:
 
-    def connect_to_reddit(self, rusername, rpassword, useragent):
-        r = praw.Reddit(user_agent=useragent, api_request_delay=1)
-        r.login(rusername, rpassword)
-        return r
+    def readconfig(self, authfilename, datafilename):
+        with open(datafilename, 'r', encoding='utf-8') as f:
+            ReddData = json.load(f)
+            ReddData['KEYWORDS'] = sorted(ReddData['KEYWORDS'], key=len, reverse=True)
+            ReddData['SRSs'] = [x.lower() for x in ReddData['SRSs']]
+            self.debug(ReddData['KEYWORDS'], DEBUG_LEVEL)
+            self.debug(ReddData['SRSs'], DEBUG_LEVEL)
+        with open(authfilename, 'r', encoding='utf-8') as f:
+            BotAuthInfo = json.load(f)
+        return ReddData, BotAuthInfo
 
-    def __init__(self, username, password, useragent):
+    def connect_to_socialmedia(self, authinfo, useragent):
+        r = praw.Reddit(user_agent=useragent, api_request_delay=1)
+        r.login(authinfo['REDDIT_BOT_USERNAME'], authinfo['REDDIT_BOT_PASSWORD'])
+
+        t = Twython(authinfo['APP_KEY'], authinfo['APP_SECRET'],
+                    authinfo['OAUTH_TOKEN'], authinfo['OAUTH_TOKEN_SECRET'])
+        return r, t
+
+    def __init__(self, useragent, authfilename, datafilename):
         self.pulllimit = {'submissions': results_limit, 'comments': results_limit_comm}
         self.first_run = True
         self.cont_num = {'comments': 0, 'submissions': 0}
         self.already_done = {'comments': [], 'submissions': []}
-        self.loops = ['submissions'] # 'submissions' and 'comments' loops
+        self.loops = ['submissions']  # 'submissions' and 'comments' loops
         self.permcounters = {'comments': 0, 'submissions': 0}
-
-        self.reddit_session = self.connect_to_reddit(username, password, useragent)
+        self.ReddData, self.BotAuthInfo = self.readconfig(authfilename, datafilename)
+        self.reddit_session, self.twitter = self.connect_to_socialmedia(self.BotAuthInfo, useragent=useragent)
 
         while True:
             try:
@@ -62,9 +60,10 @@ class ReddBot:
                         self.pulllimit[loop] = self.calculatepulllimit(self.cont_num[loop], target=loop)
                     self.permcounters[loop] += self.cont_num[loop]
 
-                self.debug('Running for :{0} secs. Submissions so far: {1}, THIS run: {2}.Comments so  far:{3}, THIS run:{4}'
-                      .format(int((time.time() - start_time)), self.permcounters['submissions'], self.cont_num['submissions'],
-                            self.permcounters['comments'], self.cont_num['comments']), DEBUG_LEVEL)
+                self.debug('Running for :{0} secs. Submissions so far: {1}, THIS run: {2}. Comments so  far:{3}, THIS run:{4}'
+                           .format(int((time.time() - start_time)), self.permcounters['submissions'],
+                                   self.cont_num['submissions'], self.permcounters['comments'],
+                                   self.cont_num['comments']), DEBUG_LEVEL)
 
                 self.first_run = False
 
@@ -73,13 +72,13 @@ class ReddBot:
             except:
                 print('HTTP Error')
             time.sleep(loop_timer)
-
+            
     def calculatepulllimit(self, lastpullnum, target):
         """this needs to be done better"""
-        add_more = {'submissions': 80, 'comments': 300} #how many items above last pull number to pull next run
+        add_more = {'submissions': 80, 'comments': 300}   # how many items above last pull number to pull next run
 
         if not lastpullnum:
-            lastpullnum = self.pulllimit[target] - 1 #in case no new results are returned
+            lastpullnum = self.pulllimit[target] - 1   # in case no new results are returned
 
         res_diff = self.pulllimit[target] - lastpullnum
         if res_diff == 0:
@@ -101,8 +100,8 @@ class ReddBot:
                     return_text = manip(content)
                     if return_text is not False:
                         print(return_text)
-                self.already_done[target].append(content.id) #add to list of already processed submissions
-                self.cont_num[target] += 1 #count the number of submissions processed each run
+                self.already_done[target].append(content.id)  # add to list of already processed submissions
+                self.cont_num[target] += 1   # count the number of submissions processed each run
 
     @staticmethod
     def debug(debugtext, level):
@@ -112,26 +111,30 @@ class ReddBot:
     def mastermanipulator(self, target):
 
         def topicmessanger(dsubmission):
+            msgtext = {'comments': "Comment concerning #{0} posted in /r/{1} {2} #reddit" }
 
             if target == 'submissions':
                 op_text = dsubmission.title + dsubmission.selftext
-            else:
+            if target == 'comments':
                 op_text = dsubmission.body
-            for item in ReddData['KEYWORDS']:
+            for item in self.ReddData['KEYWORDS']:
                 if item.lower() in op_text.lower():
                     if target == 'comments':
-                        msg = 'Comment concerning #{0} posted in /r/{1} : {2} #reddit'.format(item, dsubmission.subreddit, dsubmission.permalink)
+                        msg = msgtext['comments']\
+                            .format(item, dsubmission.subreddit, dsubmission.permalink)
                     else:
                         subreddit = str(dsubmission.subreddit)
-                        if subreddit.lower() in ReddData['SRSs']:
-                            msg = 'ATTENTION: possible reactionary brigade from /r/{1} regarding #{0}: {2} #reddit'.format(item, dsubmission.subreddit, dsubmission.short_link)
+                        if subreddit.lower() in self.ReddData['SRSs']:
+                            msg = 'ATTENTION: possible reactionary brigade from /r/{1} regarding #{0}: {2} #reddit'\
+                                .format(item, dsubmission.subreddit, dsubmission.short_link)
                         else:
-                            msg = 'Submission regarding #{0} posted in /r/{1} : {2} #reddit'.format(item, dsubmission.subreddit, dsubmission.short_link)
+                            msg = 'Submission regarding #{0} posted in /r/{1} : {2} #reddit'.format(
+                                item, dsubmission.subreddit, dsubmission.short_link)
                     if len(msg) > 140:
-                        self.debug('MSG exceeding 140 characters!! Dropping!')
-                    else:
-                        #self.reddit_session.send_message(BotAuthInfo['REDDIT_PM_TO'], 'New {0} discussion!'.format(item), msg)
-                        twitter.update_status(status=msg)
+                        msg = msg[:-7]
+                        self.debug('MSG exceeding 140 characters!! Dropping!')                    
+                    #self.reddit_session.send_message(BotAuthInfo['REDDIT_PM_TO'], 'New {0} discussion!'.format(item), msg)
+                    self.twitter.update_status(status=msg)
 
                     return 'New Topic match in:{0}, keyword:{1}'.format(dsubmission.subreddit, item)
             return False
@@ -146,6 +149,4 @@ class ReddBot:
         return returnfunctions[target]
 
 start_time = time.time()
-bot1 = ReddBot(BotAuthInfo['REDDIT_BOT_USERNAME'], BotAuthInfo['REDDIT_BOT_PASSWORD'], bot_agent_name)
-
-
+bot1 = ReddBot(useragent=bot_agent_name, authfilename='ReddAUTH.json', datafilename='ReddData.json')
