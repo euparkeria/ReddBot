@@ -124,13 +124,13 @@ class ReddBot:
 
                     elif target == 'submissions':
                         subreddit = str(dsubmission.subreddit)
-                        if subreddit.lower() in self.redd_data['SRSs'] and 'reddit' in dsubmission.url:
+                        if subreddit.lower() in self.redd_data['SRSs'] and 'reddit.com' in dsubmission.url:
                             msg = 'ATTENTION: possible reactionary brigade from /r/{1} regarding #{0}: {2} #reddit'\
                                 .format(item, dsubmission.subreddit, dsubmission.short_link)
                             try:
                                 s = self.reddit_session.get_submission(dsubmission.url)
-                                s.comments[0].reply('**NOTICE:** This comment/threat has just been targeted by a downvote brigade from [/r/{0}]({1}) \n\n '
-                                                    'I am a bot, please PM if this message is a mistake. \n\n'.format(dsubmission.subreddit, dsubmission.short_link))
+                                s.comments[0].reply('**NOTICE:** This comment/thread has just been targeted by a downvote brigade from [/r/{0}]({1}) \n\n '
+                                                    '*I am a bot, please PM if this message is a mistake.* \n\n'.format(dsubmission.subreddit, dsubmission.short_link))
                             except:
                                 print('brigade warning failed')
                         else:
