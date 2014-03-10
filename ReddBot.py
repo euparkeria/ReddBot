@@ -10,8 +10,9 @@ from twython import Twython
 watched_subreddit = 'all'
 results_limit = 200
 results_limit_comm = 1000
-bot_agent_names = ['Reddit word cloud 1.2', 'reddit topic collector 0.5', 'alpaSix search crawler 20130402r8']
+bot_agent_names = ['Reddit words 0.5', 'reddit topic collector 0.5', 'redditlink bot v12']
 loop_timer = 60
+secondary_timer = 600
 buffer_reset_lenght = 2000
 DEBUG_LEVEL = 1
 
@@ -45,6 +46,7 @@ class ReddBot:
         return r, t
 
     def __init__(self, useragent, authfilename, datafilename):
+        self.args = {'useragent': useragent, 'authfilename': authfilename, 'datafilename': datafilename}
         self.data_modified_time = 0
         self.pulllimit = {'submissions': results_limit, 'comments': results_limit_comm}
         self.first_run = True
@@ -52,39 +54,52 @@ class ReddBot:
         self.already_done = {'comments': [], 'submissions': []}
         self.loops = ['submissions']  # 'submissions' and 'comments' loops
         self.permcounters = {'comments': 0, 'submissions': 0}
+        self.loop_counter = 0
+        self.redd_data = {}
+        self.bot_auth_info = {}
+        self.reddit_session = None
+        self.twitter = None
 
         while True:
+            self.loop_counter += 1
+            if self.loop_counter >= secondary_timer / loop_timer:
+                self.debug('SEDONDARY LOOP')
+                self.loop_counter = 0
+            self._mainlooper()
 
-            if os.stat(datafilename).st_mtime > self.data_modified_time:  # check if config file has changed
-                self.redd_data, self.bot_auth_info = self.readconfig(authfilename, datafilename)
-                self.reddit_session, self.twitter = self.connect_to_socialmedia(self.bot_auth_info,
-                                                                                useragent=useragent)
+    def _mainlooper(self):
+        #try:
+        if os.stat(self.args['datafilename']).st_mtime > self.data_modified_time:  # check if config file has changed
+            self.redd_data, self.bot_auth_info = self.readconfig(self.args['authfilename'], self.args['datafilename'])
+            self.reddit_session, self.twitter = self.connect_to_socialmedia(self.bot_auth_info,
+                                                                            useragent=self.args['useragent'])
 
-            self.cont_num['submissions'] = 0
-            self.cont_num['comments'] = 0
+        self.cont_num['submissions'], self.cont_num['comments'] = 0, 0
 
-            for loop in self.loops:
-                self.contentloop(target=loop)
-                if len(self.already_done[loop]) >= buffer_reset_lenght:
-                    self.already_done[loop] = self.already_done[loop][int(len(self.already_done[loop]) / 2):]
-                    self.debug('DEBUG:buffers LENGHT after trim {0}'.format(len(self.already_done[loop])))
-                if not self.first_run:
-                    self.pulllimit[loop] = self._calculate_pull_limit(self.cont_num[loop], target=loop)
-                self.permcounters[loop] += self.cont_num[loop]
+        for loop in self.loops:
+            self.contentloop(target=loop)
+            if len(self.already_done[loop]) >= buffer_reset_lenght:
+                self.already_done[loop] = self.already_done[loop][int(len(self.already_done[loop]) / 2):]
+                self.debug('DEBUG:buffers LENGHT after trim {0}'.format(len(self.already_done[loop])))
+            if not self.first_run:
+                self.pulllimit[loop] = self._calculate_pull_limit(self.cont_num[loop], target=loop)
+            self.permcounters[loop] += self.cont_num[loop]
 
-            self.debug('Running for :{0} secs. Submissions so far: {1}, THIS run: {2}.'
-                       ' Comments so  far:{3}, THIS run:{4}'
-                       .format(int((time.time() - start_time)), self.permcounters['submissions'],
-                               self.cont_num['submissions'], self.permcounters['comments'],
-                               self.cont_num['comments']))
+        self.debug('Running for :{0} secs. Submissions so far: {1}, THIS run: {2}.'
+                   ' Comments so  far:{3}, THIS run:{4}'
+                   .format(int((time.time() - start_time)), self.permcounters['submissions'],
+                           self.cont_num['submissions'], self.permcounters['comments'],
+                           self.cont_num['comments']))
 
-            self.first_run = False
+        self.first_run = False
 
-            self.debug(self.pulllimit['submissions'])
-            self.debug(self.pulllimit['comments'])
+        self.debug(self.pulllimit['submissions'])
+        self.debug(self.pulllimit['comments'])
+        #except:
+            #print('General Error')
 
-            time.sleep(loop_timer)
-            
+        time.sleep(loop_timer)
+
     def _calculate_pull_limit(self, lastpullnum, target):
         """this needs to be done better"""
         add_more = {'submissions': 80, 'comments': 300}   # how many items above last pull number to pull next run
@@ -107,34 +122,35 @@ class ReddBot:
                 results = self.reddit_session.get_comments(watched_subreddit, limit=self.pulllimit[target])
         except:
             print('ERROR: Cant connect to reddit, may be down.')
-
-        for content in results:
-            if content.id not in self.already_done[target]:
-                for manip in self.mastermanipulator(target=target):
-                    return_text = manip(content)
-                    if return_text is not False:
-                        print(return_text)
-                self.already_done[target].append(content.id)  # add to list of already processed submissions
-                self.cont_num[target] += 1   # count the number of submissions processed each run
+        try:
+            for content in results:
+                if content.id not in self.already_done[target]:
+                    for manip in self.mastermanipulator(target=target):
+                        return_text = manip(content)
+                        if return_text is not False:
+                            print(return_text)
+                    self.already_done[target].append(content.id)  # add to list of already processed submissions
+                    self.cont_num[target] += 1   # count the number of submissions processed each run
+        except:
+            print('content loop error')
 
     @staticmethod
     def debug(debugtext, level=DEBUG_LEVEL):
-        if level >= DEBUG_LEVEL:
+        if level >= 1:
             print('*DEBUG: {}'.format(debugtext))
 
     def mastermanipulator(self, target):
 
         def topicmessanger(dsubmission):
-            msgtext = {'comments': "Comment concerning #{0} posted in /r/{1} {2} #reddit"}
-
             if target == 'submissions':
                 op_text = dsubmission.title + dsubmission.selftext
             if target == 'comments':
                 op_text = dsubmission.body
+
             for item in self.redd_data['KEYWORDS']:
                 if item.lower() in op_text.lower():
                     if target == 'comments':
-                        msg = msgtext['comments']\
+                        msg = "Comment concerning #{0} posted in /r/{1} {2} #reddit"\
                             .format(item, dsubmission.subreddit, dsubmission.permalink)
 
                     elif target == 'submissions':
