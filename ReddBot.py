@@ -17,37 +17,54 @@ buffer_reset_lenght = 2000
 DEBUG_LEVEL = 1
 
 
-class ReddBot:
+class ConnectSocialMedia:
 
-    def readconfig(self, authfilename, datafilename):
-        self.data_modified_time = os.stat(datafilename).st_mtime
-        with open(datafilename, 'r', encoding='utf-8') as f:
-            redd_data = json.load(f)
-            redd_data['KEYWORDS'] = sorted(redd_data['KEYWORDS'], key=len, reverse=True)
-            redd_data['SRSs'] = [x.lower() for x in redd_data['SRSs']]
-            self.debug(redd_data['KEYWORDS'])
-            self.debug(redd_data['SRSs'])
-        with open(authfilename, 'r', encoding='utf-8') as f:
-            bot_auth_info = json.load(f)
-        return redd_data, bot_auth_info
+    def __init__(self, authinfo, useragent):
+
+        self.reddit_session = self.connect_to_reddit(authinfo, useragent=useragent)
+        self.twitter_session = self.connect_to_twitter(authinfo)
 
     @staticmethod
-    def connect_to_socialmedia(authinfo, useragent):
+    def connect_to_reddit(authinfo, useragent):
         try:
             r = praw.Reddit(user_agent=useragent, api_request_delay=1)
             r.login(authinfo['REDDIT_BOT_USERNAME'], authinfo['REDDIT_BOT_PASSWORD'])
         except:
             print('ERROR: Cant login to Reddit.com')
+        return r
+
+    @staticmethod
+    def connect_to_twitter(authinfo):
         try:
             t = Twython(authinfo['APP_KEY'], authinfo['APP_SECRET'],
                         authinfo['OAUTH_TOKEN'], authinfo['OAUTH_TOKEN_SECRET'])
         except:
             print('ERROR: Cant authenticate into twitter')
-        return r, t
+        return t
+
+
+class ReadConfigFiles:
+    def __init__(self):
+        self.data_modified_time = 0
+
+    def readauthfile(self, authfilename):
+        with open(authfilename, 'r', encoding='utf-8') as f:
+            bot_auth_info = json.load(f)
+        return bot_auth_info
+
+    def readdatafile(self, datafilename):
+        self.data_modified_time = os.stat(datafilename).st_mtime
+        with open(datafilename, 'r', encoding='utf-8') as f:
+            redd_data = json.load(f)
+            redd_data['KEYWORDS'] = sorted(redd_data['KEYWORDS'], key=len, reverse=True)
+            redd_data['SRSs'] = [x.lower() for x in redd_data['SRSs']]
+        return redd_data
+
+
+class ReddBot:
 
     def __init__(self, useragent, authfilename, datafilename):
         self.args = {'useragent': useragent, 'authfilename': authfilename, 'datafilename': datafilename}
-        self.data_modified_time = 0
         self.pulllimit = {'submissions': results_limit, 'comments': results_limit_comm}
         self.first_run = True
         self.cont_num = {'comments': 0, 'submissions': 0}
@@ -59,6 +76,7 @@ class ReddBot:
         self.bot_auth_info = {}
         self.reddit_session = None
         self.twitter = None
+        self.config = ReadConfigFiles()
 
         while True:
             self.loop_counter += 1
@@ -69,10 +87,13 @@ class ReddBot:
 
     def _mainlooper(self):
         #try:
-        if os.stat(self.args['datafilename']).st_mtime > self.data_modified_time:  # check if config file has changed
-            self.redd_data, self.bot_auth_info = self.readconfig(self.args['authfilename'], self.args['datafilename'])
-            self.reddit_session, self.twitter = self.connect_to_socialmedia(self.bot_auth_info,
-                                                                            useragent=self.args['useragent'])
+        if os.stat(self.args['datafilename']).st_mtime > self.config.data_modified_time:  # check if config file has changed
+            self.redd_data = self.config.readdatafile(self.args['datafilename'])
+            self.bot_auth_info = self.config.readauthfile(self.args['authfilename'])
+            bot_session = ConnectSocialMedia(self.bot_auth_info, useragent=self.args['useragent'])
+            self.reddit_session = bot_session.reddit_session
+            self.twitter = bot_session.twitter_session
+            self.debug('CONFIG FILES REREAD, RECONNEECTED!')
 
         self.cont_num['submissions'], self.cont_num['comments'] = 0, 0
 
