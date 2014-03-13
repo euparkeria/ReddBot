@@ -86,7 +86,7 @@ class ReddBot:
             self._mainlooper()
 
     def _mainlooper(self):
-        #try:
+
         if os.stat(self.args['datafilename']).st_mtime > self.config.data_modified_time:  # check if config file has changed
             self.redd_data = self.config.readdatafile(self.args['datafilename'])
             self.bot_auth_info = self.config.readauthfile(self.args['authfilename'])
@@ -116,8 +116,6 @@ class ReddBot:
 
         self.debug(self.pulllimit['submissions'])
         self.debug(self.pulllimit['comments'])
-        #except:
-            #print('General Error')
 
         time.sleep(loop_timer)
 
@@ -125,8 +123,8 @@ class ReddBot:
         """this needs to be done better"""
         add_more = {'submissions': 80, 'comments': 300}   # how many items above last pull number to pull next run
 
-        if not lastpullnum:
-            lastpullnum = self.pulllimit[target] - 1   # in case no new results are returned
+        if lastpullnum == 0:
+            lastpullnum = results_limit / 2   # in case no new results are returned
 
         res_diff = self.pulllimit[target] - lastpullnum
         if res_diff == 0:
@@ -162,7 +160,7 @@ class ReddBot:
 
     def mastermanipulator(self, target):
 
-        def topicmessanger(dsubmission):
+        def topicmessenger(dsubmission):
             if target == 'submissions':
                 op_text = dsubmission.title + dsubmission.selftext
             if target == 'comments':
@@ -181,17 +179,17 @@ class ReddBot:
                                 .format(item, dsubmission.subreddit, dsubmission.short_link)
                             try:
                                 s = self.reddit_session.get_submission(dsubmission.url)
-                                s.comments[0].reply('##NOTICE: *This comment/thread has just been targeted'
-                                                    ' by a downvote brigade from [/r/{0}]({1})* \n\n '
-                                                    '*I am a bot, please PM if this message is a mistake.* \n\n'
-                                                    .format(dsubmission.subreddit, dsubmission.short_link))
+                                s.comments[0].reply('#**NOTICE**: ReddBot detected this comment/thread has been targeted'
+                                                    ' by a downvote brigade from [/r/{0}]({1}) \n--------------------\n '
+                                                    '*{2}* \n\n'
+                                                    .format(dsubmission.subreddit, dsubmission.short_link, choice(self.redd_data['quotes'])))
                             except:
                                 print('brigade warning failed, cant comment')
                         else:
                             msg = 'Submission regarding #{0} posted in /r/{1} : {2} #reddit'.format(
                                 item, dsubmission.subreddit, dsubmission.short_link)
                     if len(msg) > 140:
-                        msg = msg[:-8]
+                        msg = msg[:139]
                         self.debug('MSG exceeding 140 characters!!')
                     #self.reddit_session.send_message(bot_auth_info['REDDIT_PM_TO'], 'New {0} discussion!'.format(item), msg)
                     try:
@@ -208,7 +206,7 @@ class ReddBot:
         '''
         IF YOU WANT TO DISABLE A BOT FEATURE for a specific loop REMOVE IT FROM THE DICTIONARY BELLOW
         '''
-        returnfunctions = {'comments': [topicmessanger, nothing], 'submissions': [topicmessanger, nothing]}
+        returnfunctions = {'comments': [topicmessenger, nothing], 'submissions': [topicmessenger, nothing]}
         return returnfunctions[target]
 
 start_time = time.time()
