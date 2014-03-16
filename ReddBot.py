@@ -201,12 +201,15 @@ class ReddBot:
                 s.comments[0].reply('#**NOTICE**: ReddBot detected this comment/thread has been targeted by a downvote'
                                     ' brigade from [/r/{0}]({1}) \n--------------------\n *{2}* \n\n'
                              .format(result.submission.subreddit, result.submission.short_link, choice(self.redd_data['quotes'])))
+                self.debug('AntiBrigadeBot NOTICE sent')
                 if result.keyword:
                     msg = 'ATTENTION: possible reactionary brigade from /r/{1} regarding #{0}: {2} #reddit'\
                                 .format(result.keyword, result.submission.subreddit, result.submission.short_link)
+
             elif result.keyword:
                 msg = 'Submission regarding #{0} posted in /r/{1} : {2} #reddit'.format(
                     result.keyword, result.submission.subreddit, result.submission.short_link)
+                self.debug('New Topic Match in" {}'.format(result.submission.subreddit))
             if msg:
                 self.tweet_this(msg)
 
@@ -223,7 +226,7 @@ class ReddBot:
             self.debug('MSG exceeding 140 characters!!')
         try:
             self.twitter.update_status(status=msg)
-            self.debug('Tweet sent!!!')
+            self.debug('TWEET sent!!!')
         except:
             print('ERROR: couldnt update twitter status')
 
