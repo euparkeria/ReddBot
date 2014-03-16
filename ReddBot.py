@@ -66,7 +66,7 @@ class MatchedSubmissions:
 
     def __init__(self, dsubmission, target, keyword_lists):
         self.is_srs = False
-        self.keyword = ''
+        self.keyword = False
         self.submission = dsubmission
         self.target = target
 
@@ -179,20 +179,21 @@ class ReddBot:
                 results = self.reddit_session.get_comments(watched_subreddit, limit=self.pulllimit[target])
         except:
             print('ERROR: Cant connect to reddit, may be down.')
-        try:
-            for submission in results:
-                if submission.id not in self.already_done[target]:
-                    sub = MatchedSubmissions(target=target, dsubmission=submission, keyword_lists=self.redd_data)
-                    self.already_done[target].append(submission.id)  # add to list of already processed submissions
-                    self.cont_num[target] += 1   # count the number of submissions processed each run
+        #try:
+        for submission in results:
+            if submission.id not in self.already_done[target]:
+                sub = MatchedSubmissions(target=target, dsubmission=submission, keyword_lists=self.redd_data)
+                self.already_done[target].append(submission.id)  # add to list of already processed submissions
+                self.cont_num[target] += 1   # count the number of submissions processed each run
 
-            self.dispatch_nitifications(results_list=sub.matching_results)
+        self.dispatch_nitifications(results_list=sub.matching_results)
 
-            MatchedSubmissions.matching_results = []
-        except:
-            print('content loop error')
+        MatchedSubmissions.matching_results = []
+        #except:
+            #print('content loop error')
 
     def dispatch_nitifications(self, results_list):
+        msg = ''
         for result in results_list:
             if result.is_srs:
                 s = self.reddit_session.get_submission(result.submission.url)
@@ -221,7 +222,7 @@ class ReddBot:
             self.debug('MSG exceeding 140 characters!!')
         try:
             self.twitter.update_status(status=msg)
-            print('Tweet sent!')
+            self.debug('Tweet sent!!!')
         except:
             print('ERROR: couldnt update twitter status')
 
