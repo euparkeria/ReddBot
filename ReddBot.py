@@ -52,11 +52,14 @@ class ReadConfigFiles:
         return bot_auth_info
 
     def readdatafile(self, datafilename):
-        self.data_modified_time = os.stat(datafilename).st_mtime
-        with open(datafilename, 'r', encoding='utf-8') as f:
-            redd_data = json.load(f)
-            redd_data['KEYWORDS'] = sorted(redd_data['KEYWORDS'], key=len, reverse=True)
-            redd_data['SRSs'] = [x.lower() for x in redd_data['SRSs']]
+        try:
+            self.data_modified_time = os.stat(datafilename).st_mtime
+            with open(datafilename, 'r', encoding='utf-8') as f:
+                redd_data = json.load(f)
+                redd_data['KEYWORDS'] = sorted(redd_data['KEYWORDS'], key=len, reverse=True)
+                redd_data['SRSs'] = [x.lower() for x in redd_data['SRSs']]
+        except:
+            print("Error reading data file")
         return redd_data
 
 
@@ -69,7 +72,8 @@ class MatchedSubmissions:
         self.keyword = False
         self.submission = dsubmission
         self.target = target
-        _check_keywords = self._find_matching_keywords(target=target, dsubmission=dsubmission, keywords=keyword_lists['KEYWORDS'])
+        _check_keywords = self._find_matching_keywords(target=target, dsubmission=dsubmission,
+                                                       keywords=keyword_lists['KEYWORDS'])
         _check_brigade = self._detect_brigade(dsubmission=dsubmission, srs_list=keyword_lists['SRSs'])
 
         if _check_keywords or _check_brigade:
@@ -124,7 +128,7 @@ class ReddBot:
 
     def _mainlooper(self):
 
-        if os.stat(self.args['datafilename']).st_mtime > self.config.data_modified_time:  # check if config file has changed
+        if os.stat(self.args['datafilename']).st_mtime > self.config.data_modified_time:
             self.redd_data = self.config.readdatafile(self.args['datafilename'])
             self.bot_auth_info = self.config.readauthfile(self.args['authfilename'])
             self.debug('CONFIG FILES REREAD!')
@@ -180,18 +184,18 @@ class ReddBot:
                 results = self.reddit_session.get_comments(watched_subreddit, limit=self.pulllimit[target])
         except:
             print('ERROR: Cant connect to reddit, may be down.')
-        #try:
-        for submission in results:
-            if submission.id not in self.already_done[target]:
-                sub = MatchedSubmissions(target=target, dsubmission=submission, keyword_lists=self.redd_data)
-                self.already_done[target].append(submission.id)  # add to list of already processed submissions
-                self.cont_num[target] += 1   # count the number of submissions processed each run
+        try:
+            for submission in results:
+                if submission.id not in self.already_done[target]:
+                    sub = MatchedSubmissions(target=target, dsubmission=submission, keyword_lists=self.redd_data)
+                    self.already_done[target].append(submission.id)  # add to list of already processed submissions
+                    self.cont_num[target] += 1   # count the number of submissions processed each run
 
-        self.dispatch_nitifications(results_list=sub.matching_results)
+            self.dispatch_nitifications(results_list=sub.matching_results)
 
-        MatchedSubmissions.matching_results = []
-        #except:
-            #print('content loop error')
+            MatchedSubmissions.matching_results = []
+        except:
+            print('content loop error')
 
     def dispatch_nitifications(self, results_list):
         for result in results_list:
@@ -200,7 +204,8 @@ class ReddBot:
                 s = self.reddit_session.get_submission(result.submission.url)
                 s.comments[0].reply('#**NOTICE**: ReddBot detected this comment/thread has been targeted by a downvote'
                                     ' brigade from [/r/{0}]({1}) \n--------------------\n *{2}* \n\n'
-                             .format(result.submission.subreddit, result.submission.short_link, choice(self.redd_data['quotes'])))
+                             .format(result.submission.subreddit, result.submission.short_link,
+                                     choice(self.redd_data['quotes'])))
                 self.debug('AntiBrigadeBot NOTICE sent')
                 if result.keyword:
                     msg = 'ATTENTION: possible reactionary brigade from /r/{1} regarding #{0}: {2} #reddit'\
@@ -209,10 +214,9 @@ class ReddBot:
             elif result.keyword:
                 msg = 'Submission regarding #{0} posted in /r/{1} : {2} #reddit'.format(
                     result.keyword, result.submission.subreddit, result.submission.short_link)
-                self.debug('New Topic Match in" {}'.format(result.submission.subreddit))
+                self.debug('New Topic Match in: {}'.format(result.submission.subreddit))
             if msg:
                 self.tweet_this(msg)
-
 
     @staticmethod
     def debug(debugtext, level=DEBUG_LEVEL):
