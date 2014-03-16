@@ -10,10 +10,9 @@ from twython import Twython
 watched_subreddit = 'all'
 results_limit = 200
 results_limit_comm = 1000
-bot_agent_names = ['Reddit words 0.5', 'reddit topic collector 0.5', 'redditlink bot v12']
+bot_agent_names = ['redditlink bot v12']
 loop_timer = 60
-secondary_timer = 600
-buffer_reset_lenght = 2000
+secondary_timer = loop_timer * 10
 DEBUG_LEVEL = 1
 
 
@@ -61,6 +60,42 @@ class ReadConfigFiles:
         return redd_data
 
 
+class MatchedSubmissions:
+
+    matching_results = []
+
+    def __init__(self, dsubmission, target, keyword_lists):
+        self.is_srs = False
+        self.submission = dsubmission
+        self.target = target
+        self.keyword = ''
+        if self._find_matching_keywords(target=target, dsubmission=dsubmission, keyword_list=keyword_lists['KEYWORDS']) \
+                or self._detect_brigade(dsubmission=dsubmission, srs_list=keyword_lists['SRSs']):
+            MatchedSubmissions.matching_results.append(self)
+
+    @staticmethod
+    def _get_text_body(target, dsubmission):
+        if target == 'submissions':
+            return dsubmission.title + dsubmission.selftext
+        if target == 'comments':
+            return dsubmission.body
+
+    def _find_matching_keywords(self, target, dsubmission, keyword_list):
+        op_text = self._get_text_body(target, dsubmission)
+        for keyword in keyword_list:
+            if keyword.lower() in op_text.lower():
+                self.keyword = keyword
+                return True
+        return False
+
+    def _detect_brigade(self, dsubmission, srs_list):
+        subreddit = str(dsubmission.subreddit)
+        if subreddit.lower() in srs_list and 'reddit.com' in dsubmission.url and not dsubmission.is_self:
+            self.is_srs = True
+            return True
+        return False
+
+
 class ReddBot:
 
     def __init__(self, useragent, authfilename, datafilename):
@@ -90,15 +125,17 @@ class ReddBot:
         if os.stat(self.args['datafilename']).st_mtime > self.config.data_modified_time:  # check if config file has changed
             self.redd_data = self.config.readdatafile(self.args['datafilename'])
             self.bot_auth_info = self.config.readauthfile(self.args['authfilename'])
+            self.debug('CONFIG FILES REREAD!')
             bot_session = ConnectSocialMedia(self.bot_auth_info, useragent=self.args['useragent'])
             self.reddit_session = bot_session.reddit_session
             self.twitter = bot_session.twitter_session
-            self.debug('CONFIG FILES REREAD, RECONNEECTED!')
+            self.debug('RECONNECTED!')
 
         self.cont_num['submissions'], self.cont_num['comments'] = 0, 0
 
         for loop in self.loops:
             self.contentloop(target=loop)
+            buffer_reset_lenght = self.pulllimit[loop] * 10
             if len(self.already_done[loop]) >= buffer_reset_lenght:
                 self.already_done[loop] = self.already_done[loop][int(len(self.already_done[loop]) / 2):]
                 self.debug('DEBUG:buffers LENGHT after trim {0}'.format(len(self.already_done[loop])))
@@ -142,14 +179,19 @@ class ReddBot:
         except:
             print('ERROR: Cant connect to reddit, may be down.')
         try:
-            for content in results:
-                if content.id not in self.already_done[target]:
+            for submission in results:
+                if submission.id not in self.already_done[target]:
+                    sub = MatchedSubmissions(target=target, dsubmission=submission, keyword_lists=self.redd_data)
+
                     for manip in self.mastermanipulator(target=target):
-                        return_text = manip(content)
+                        return_text = manip(submission)
                         if return_text is not False:
                             print(return_text)
-                    self.already_done[target].append(content.id)  # add to list of already processed submissions
+                    self.already_done[target].append(submission.id)  # add to list of already processed submissions
                     self.cont_num[target] += 1   # count the number of submissions processed each run
+            print(sub.matching_results)
+            print(sub.matching_results[0].is_srs)
+            #sub.matching_results = []
         except:
             print('content loop error')
 
