@@ -66,10 +66,11 @@ class MatchedSubmissions:
 
     def __init__(self, dsubmission, target, keyword_lists):
         self.is_srs = False
+        self.keyword = ''
         self.submission = dsubmission
         self.target = target
-        self.keyword = ''
-        if self._find_matching_keywords(target=target, dsubmission=dsubmission, keyword_list=keyword_lists['KEYWORDS']) \
+
+        if self._find_matching_keywords(target=target, dsubmission=dsubmission, keywords=keyword_lists['KEYWORDS']) \
                 or self._detect_brigade(dsubmission=dsubmission, srs_list=keyword_lists['SRSs']):
             MatchedSubmissions.matching_results.append(self)
 
@@ -80,10 +81,10 @@ class MatchedSubmissions:
         if target == 'comments':
             return dsubmission.body
 
-    def _find_matching_keywords(self, target, dsubmission, keyword_list):
-        op_text = self._get_text_body(target, dsubmission)
-        for keyword in keyword_list:
-            if keyword.lower() in op_text.lower():
+    def _find_matching_keywords(self, target, dsubmission, keywords):
+        body_text = self._get_text_body(target, dsubmission)
+        for keyword in keywords:
+            if keyword.lower() in body_text.lower():
                 self.keyword = keyword
                 return True
         return False
@@ -182,74 +183,48 @@ class ReddBot:
             for submission in results:
                 if submission.id not in self.already_done[target]:
                     sub = MatchedSubmissions(target=target, dsubmission=submission, keyword_lists=self.redd_data)
-
-                    for manip in self.mastermanipulator(target=target):
-                        return_text = manip(submission)
-                        if return_text is not False:
-                            print(return_text)
                     self.already_done[target].append(submission.id)  # add to list of already processed submissions
                     self.cont_num[target] += 1   # count the number of submissions processed each run
-            print(sub.matching_results)
-            print(sub.matching_results[0].is_srs)
-            #sub.matching_results = []
+
+            self.dispatch_nitifications(results_list=sub.matching_results)
+
+            MatchedSubmissions.matching_results = []
         except:
             print('content loop error')
+
+    def dispatch_nitifications(self, results_list):
+        for result in results_list:
+            if result.is_srs:
+                s = self.reddit_session.get_submission(result.submission.url)
+                s.comments[0].reply('#**NOTICE**: ReddBot detected this comment/thread has been targeted by a downvote'
+                                    ' brigade from [/r/{0}]({1}) \n--------------------\n *{2}* \n\n'
+                             .format(result.submission.subreddit, result.submission.short_link, choice(self.redd_data['quotes'])))
+                if result.keyword:
+                    msg = 'ATTENTION: possible reactionary brigade from /r/{1} regarding #{0}: {2} #reddit'\
+                                .format(result.keyword, result.submission.subreddit, result.submission.short_link)
+            elif result.keyword:
+                msg = 'Submission regarding #{0} posted in /r/{1} : {2} #reddit'.format(
+                    result.keyword, result.submission.subreddit, result.submission.short_link)
+            if msg:
+                self.tweet_this(msg)
+
 
     @staticmethod
     def debug(debugtext, level=DEBUG_LEVEL):
         if level >= 1:
             print('*DEBUG: {}'.format(debugtext))
 
-    def mastermanipulator(self, target):
+    def tweet_this(self, msg):
 
-        def topicmessenger(dsubmission):
-            if target == 'submissions':
-                op_text = dsubmission.title + dsubmission.selftext
-            if target == 'comments':
-                op_text = dsubmission.body
+        if len(msg) > 140:
+            msg = msg[:139]
+            self.debug('MSG exceeding 140 characters!!')
+        try:
+            self.twitter.update_status(status=msg)
+            print('Tweet sent!')
+        except:
+            print('ERROR: couldnt update twitter status')
 
-            for item in self.redd_data['KEYWORDS']:
-                if item.lower() in op_text.lower():
-                    if target == 'comments':
-                        msg = "Comment concerning #{0} posted in /r/{1} {2} #reddit"\
-                            .format(item, dsubmission.subreddit, dsubmission.permalink)
-
-                    elif target == 'submissions':
-                        subreddit = str(dsubmission.subreddit)
-                        if subreddit.lower() in self.redd_data['SRSs'] and 'reddit.com' in dsubmission.url and not dsubmission.is_self:
-                            msg = 'ATTENTION: possible reactionary brigade from /r/{1} regarding #{0}: {2} #reddit'\
-                                .format(item, dsubmission.subreddit, dsubmission.short_link)
-                            try:
-                                s = self.reddit_session.get_submission(dsubmission.url)
-                                s.comments[0].reply('#**NOTICE**: ReddBot detected this comment/thread has been targeted'
-                                                    ' by a downvote brigade from [/r/{0}]({1}) \n--------------------\n '
-                                                    '*{2}* \n\n'
-                                                    .format(dsubmission.subreddit, dsubmission.short_link, choice(self.redd_data['quotes'])))
-                            except:
-                                print('brigade warning failed, cant comment')
-                        else:
-                            msg = 'Submission regarding #{0} posted in /r/{1} : {2} #reddit'.format(
-                                item, dsubmission.subreddit, dsubmission.short_link)
-                    if len(msg) > 140:
-                        msg = msg[:139]
-                        self.debug('MSG exceeding 140 characters!!')
-                    #self.reddit_session.send_message(bot_auth_info['REDDIT_PM_TO'], 'New {0} discussion!'.format(item), msg)
-                    try:
-                        self.twitter.update_status(status=msg)
-                    except:
-                        print('ERROR: couldnt update twitter status')
-
-                    return 'New Topic match in:{0}, keyword:{1}'.format(dsubmission.subreddit, item)
-            return False
-
-        def nothing(nothing):
-            return False
-
-        '''
-        IF YOU WANT TO DISABLE A BOT FEATURE for a specific loop REMOVE IT FROM THE DICTIONARY BELLOW
-        '''
-        returnfunctions = {'comments': [topicmessenger, nothing], 'submissions': [topicmessenger, nothing]}
-        return returnfunctions[target]
 
 start_time = time.time()
 bot1 = ReddBot(useragent=choice(bot_agent_names), authfilename='ReddAUTH.json', datafilename='ReddData.json')
