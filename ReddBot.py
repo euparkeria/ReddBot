@@ -69,9 +69,10 @@ class MatchedSubmissions:
         self.keyword = False
         self.submission = dsubmission
         self.target = target
+        _check_keywords = self._find_matching_keywords(target=target, dsubmission=dsubmission, keywords=keyword_lists['KEYWORDS'])
+        _check_brigade = self._detect_brigade(dsubmission=dsubmission, srs_list=keyword_lists['SRSs'])
 
-        if self._find_matching_keywords(target=target, dsubmission=dsubmission, keywords=keyword_lists['KEYWORDS']) \
-                or self._detect_brigade(dsubmission=dsubmission, srs_list=keyword_lists['SRSs']):
+        if _check_keywords or _check_brigade:
             MatchedSubmissions.matching_results.append(self)
 
     @staticmethod
@@ -193,8 +194,8 @@ class ReddBot:
             #print('content loop error')
 
     def dispatch_nitifications(self, results_list):
-        msg = ''
         for result in results_list:
+            msg = 0
             if result.is_srs:
                 s = self.reddit_session.get_submission(result.submission.url)
                 s.comments[0].reply('#**NOTICE**: ReddBot detected this comment/thread has been targeted by a downvote'
