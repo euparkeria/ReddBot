@@ -115,7 +115,7 @@ class ReddBot:
         self.args = {'useragent': useragent, 'authfilename': authfilename, 'datafilename': datafilename}
         self.pulllimit = {'submissions': results_limit, 'comments': results_limit_comm}
         self.cont_num = {'comments': 0, 'submissions': 0}
-        self.already_done = {'comments': [], 'submissions': []}
+        self.processed_objects = {'comments': [], 'submissions': []}
         self.loops = ['submissions']  # 'submissions' and 'comments' loops
         self.permcounters = {'comments': 0, 'submissions': 0}
         self.loop_counter = 0
@@ -148,9 +148,9 @@ class ReddBot:
         for loop in self.loops:
             self._contentloop(target=loop)
             buffer_reset_lenght = self.pulllimit[loop] * 10
-            if len(self.already_done[loop]) >= buffer_reset_lenght:
-                self.already_done[loop] = self.already_done[loop][int(len(self.already_done[loop]) / 2):]
-                self.debug('Buffers LENGHT after trim {0}'.format(len(self.already_done[loop])))
+            if len(self.processed_objects[loop]) >= buffer_reset_lenght:
+                self.processed_objects[loop] = self.processed_objects[loop][int(len(self.processed_objects[loop]) / 2):]
+                self.debug('Buffers LENGHT after trim {0}'.format(len(self.processed_objects[loop])))
             if not self.first_run:
                 self.pulllimit[loop] = self._calculate_pull_limit(self.cont_num[loop], target=loop)
             self.permcounters[loop] += self.cont_num[loop]
@@ -190,9 +190,9 @@ class ReddBot:
         new_submissions_list = []
         try:
             for submission in results:
-                if submission.id not in self.already_done[target]:
+                if submission.id not in self.processed_objects[target]:
                     new_submissions_list.append(submission)
-                    self.already_done[target].append(submission.id)  # add to list of already processed submission
+                    self.processed_objects[target].append(submission.id)  # add to list of already processed submission
                     self.cont_num[target] += 1   # count the number of submissions processed each run
         except:
             print('ERROR:Cannot connect to reddit!!!')
@@ -224,7 +224,7 @@ class ReddBot:
                     print('Bot Cant post in:{}'.format(result.submission.subreddit))
                 if result.keyword:  # also tweet notification if the srs inludes a keyword
                     msg = 'ATTENTION: possible reactionary brigade from /r/{1} regarding #{0}: {2} #reddit'\
-                                .format(result.keyword, result.submission.subreddit, result.submission.short_link)
+                        .format(result.keyword, result.submission.subreddit, result.submission.short_link)
 
             elif result.keyword:
                 msg = 'Submission regarding #{0} posted in /r/{1} : {2} #reddit'.format(
