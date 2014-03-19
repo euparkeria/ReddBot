@@ -147,7 +147,7 @@ class ReddBot:
         self.cont_num['submissions'], self.cont_num['comments'] = 0, 0
 
         for loop in self.loops:
-            self.contentloop(target=loop)
+            self._contentloop(target=loop)
             buffer_reset_lenght = self.pulllimit[loop] * 10
             if len(self.already_done[loop]) >= buffer_reset_lenght:
                 self.already_done[loop] = self.already_done[loop][int(len(self.already_done[loop]) / 2):]
@@ -189,15 +189,17 @@ class ReddBot:
         if target == 'comments':
             results = self.reddit_session.get_comments(watched_subreddit, limit=self.pulllimit[target])
         new_submissions_list = []
-        for submission in results:
-            if submission.id not in self.already_done[target]:
-                new_submissions_list.append(submission)
-                self.already_done[target].append(submission.id)  # add to list of already processed submission
-                self.cont_num[target] += 1   # count the number of submissions processed each run
+        try:
+            for submission in results:
+                if submission.id not in self.already_done[target]:
+                    new_submissions_list.append(submission)
+                    self.already_done[target].append(submission.id)  # add to list of already processed submission
+                    self.cont_num[target] += 1   # count the number of submissions processed each run
+        except:
+            print('ERROR:Cannot connect to reddit!!!')
         return new_submissions_list
 
-    def contentloop(self, target):
-        #try:
+    def _contentloop(self, target):
         result_object = []
         for new_submission in self._get_new_comments_or_subs(target):
             result_object = MatchedSubmissions(target=target, dsubmission=new_submission,
@@ -207,23 +209,21 @@ class ReddBot:
             self.dispatch_nitifications(results_list=result_object.matching_results)
             result_object.empty_list()
 
-        #except:
-            #print('content loop error')
-
     def dispatch_nitifications(self, results_list):
         for result in results_list:
             msg = ''
             if result.is_srs:
                 s = self.reddit_session.get_submission(result.submission.url)
                 try:
-                    s.comments[0].reply('#**NOTICE**: ReddBot detected this comment/thread has been targeted by a downvote'
+                    s.comments[0].reply('#**NOTICE**: ReddBot detected this '
+                                        'comment/thread has been targeted by a downvote'
                                         ' brigade from [/r/{0}]({1}) \n--------------------\n *{2}* \n\n'
                                  .format(result.submission.subreddit, result.submission.short_link,
                                          choice(self.redd_data['quotes'])))
                     self.debug('AntiBrigadeBot NOTICE sent')
                 except:
                     print('Bot Cant post in:{}'.format(result.submission.subreddit))
-                if result.keyword:
+                if result.keyword:  # also tweet notification if the srs inludes a keyword
                     msg = 'ATTENTION: possible reactionary brigade from /r/{1} regarding #{0}: {2} #reddit'\
                                 .format(result.keyword, result.submission.subreddit, result.submission.short_link)
 
@@ -245,7 +245,7 @@ class ReddBot:
             self.debug('MSG exceeding 140 characters!!')
         try:
             self.twitter.update_status(status=msg)
-            self.debug('TWEET sent!!!')
+            self.debug('TWEET SENT!!!')
         except:
             print('ERROR: couldnt update twitter status')
 
