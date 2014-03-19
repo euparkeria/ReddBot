@@ -59,8 +59,7 @@ class ReadConfigFiles:
                 redd_data = json.load(f)
                 redd_data['KEYWORDS'] = sorted(redd_data['KEYWORDS'], key=len, reverse=True)
                 redd_data['SRSs'] = [x.lower() for x in redd_data['SRSs']]
-                redd_data['quotes'] = [''.join(('^', x)) for x in redd_data['quotes']]
-                redd_data['quotes'] = [x.replace(" ", " ^") for x in redd_data['quotes']]
+                redd_data['quotes'] = [''.join(('^', x.replace(" ", " ^"))) for x in redd_data['quotes']]
         except:
             print("Error reading data file")
         return redd_data
