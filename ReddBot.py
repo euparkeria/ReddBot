@@ -46,7 +46,8 @@ class ReadConfigFiles:
     def __init__(self):
         self.data_modified_time = 0
 
-    def readauthfile(self, authfilename):
+    @staticmethod
+    def readauthfile(authfilename):
         with open(authfilename, 'r', encoding='utf-8') as f:
             bot_auth_info = json.load(f)
         return bot_auth_info
@@ -58,6 +59,8 @@ class ReadConfigFiles:
                 redd_data = json.load(f)
                 redd_data['KEYWORDS'] = sorted(redd_data['KEYWORDS'], key=len, reverse=True)
                 redd_data['SRSs'] = [x.lower() for x in redd_data['SRSs']]
+                redd_data['quotes'] = [''.join(('^', x)) for x in redd_data['quotes']]
+                redd_data['quotes'] = [x.replace(" ", " ^") for x in redd_data['quotes']]
         except:
             print("Error reading data file")
         return redd_data
@@ -101,13 +104,17 @@ class MatchedSubmissions:
             return True
         return False
 
+    @staticmethod
+    def empty_list():
+        MatchedSubmissions.matching_results = []
+
 
 class ReddBot:
 
     def __init__(self, useragent, authfilename, datafilename):
+        self.first_run = True
         self.args = {'useragent': useragent, 'authfilename': authfilename, 'datafilename': datafilename}
         self.pulllimit = {'submissions': results_limit, 'comments': results_limit_comm}
-        self.first_run = True
         self.cont_num = {'comments': 0, 'submissions': 0}
         self.already_done = {'comments': [], 'submissions': []}
         self.loops = ['submissions']  # 'submissions' and 'comments' loops
@@ -144,13 +151,13 @@ class ReddBot:
             buffer_reset_lenght = self.pulllimit[loop] * 10
             if len(self.already_done[loop]) >= buffer_reset_lenght:
                 self.already_done[loop] = self.already_done[loop][int(len(self.already_done[loop]) / 2):]
-                self.debug('DEBUG:buffers LENGHT after trim {0}'.format(len(self.already_done[loop])))
+                self.debug('Buffers LENGHT after trim {0}'.format(len(self.already_done[loop])))
             if not self.first_run:
                 self.pulllimit[loop] = self._calculate_pull_limit(self.cont_num[loop], target=loop)
             self.permcounters[loop] += self.cont_num[loop]
 
-        self.debug('Running for :{0} secs. Submissions so far: {1}, THIS run: {2}.'
-                   ' Comments so  far:{3}, THIS run:{4}'
+        self.debug('{0}th sec. Sub so far:{1},THIS run:{2}.'
+                   'Comments so far:{3},THIS run:{4}'
                    .format(int((time.time() - start_time)), self.permcounters['submissions'],
                            self.cont_num['submissions'], self.permcounters['comments'],
                            self.cont_num['comments']))
@@ -176,37 +183,46 @@ class ReddBot:
             self.pulllimit[target] = lastpullnum + add_more[target]
         return int(self.pulllimit[target])
 
+    def _get_new_comments_or_subs(self, target):
+        if target == 'submissions':
+            results = self.reddit_session.get_subreddit(watched_subreddit).get_new(limit=self.pulllimit[target])
+        if target == 'comments':
+            results = self.reddit_session.get_comments(watched_subreddit, limit=self.pulllimit[target])
+        new_submissions_list = []
+        for submission in results:
+            if submission.id not in self.already_done[target]:
+                new_submissions_list.append(submission)
+                self.already_done[target].append(submission.id)  # add to list of already processed submission
+                self.cont_num[target] += 1   # count the number of submissions processed each run
+        return new_submissions_list
+
     def contentloop(self, target):
-        try:
-            if target == 'submissions':
-                results = self.reddit_session.get_subreddit(watched_subreddit).get_new(limit=self.pulllimit[target])
-            if target == 'comments':
-                results = self.reddit_session.get_comments(watched_subreddit, limit=self.pulllimit[target])
-        except:
-            print('ERROR: Cant connect to reddit, may be down.')
-        try:
-            for submission in results:
-                if submission.id not in self.already_done[target]:
-                    sub = MatchedSubmissions(target=target, dsubmission=submission, keyword_lists=self.redd_data)
-                    self.already_done[target].append(submission.id)  # add to list of already processed submissions
-                    self.cont_num[target] += 1   # count the number of submissions processed each run
+        #try:
+        result_object = []
+        for new_submission in self._get_new_comments_or_subs(target):
+            result_object = MatchedSubmissions(target=target, dsubmission=new_submission,
+                                               keyword_lists=self.redd_data)
 
-            self.dispatch_nitifications(results_list=sub.matching_results)
+        if result_object.matching_results:
+            self.dispatch_nitifications(results_list=result_object.matching_results)
+            result_object.empty_list()
 
-            MatchedSubmissions.matching_results = []
-        except:
-            print('content loop error')
+        #except:
+            #print('content loop error')
 
     def dispatch_nitifications(self, results_list):
         for result in results_list:
-            msg = 0
+            msg = ''
             if result.is_srs:
                 s = self.reddit_session.get_submission(result.submission.url)
-                s.comments[0].reply('#**NOTICE**: ReddBot detected this comment/thread has been targeted by a downvote'
-                                    ' brigade from [/r/{0}]({1}) \n--------------------\n *{2}* \n\n'
-                             .format(result.submission.subreddit, result.submission.short_link,
-                                     choice(self.redd_data['quotes'])))
-                self.debug('AntiBrigadeBot NOTICE sent')
+                try:
+                    s.comments[0].reply('#**NOTICE**: ReddBot detected this comment/thread has been targeted by a downvote'
+                                        ' brigade from [/r/{0}]({1}) \n--------------------\n *{2}* \n\n'
+                                 .format(result.submission.subreddit, result.submission.short_link,
+                                         choice(self.redd_data['quotes'])))
+                    self.debug('AntiBrigadeBot NOTICE sent')
+                except:
+                    print('Bot Cant post in:{}'.format(result.submission.subreddit))
                 if result.keyword:
                     msg = 'ATTENTION: possible reactionary brigade from /r/{1} regarding #{0}: {2} #reddit'\
                                 .format(result.keyword, result.submission.subreddit, result.submission.short_link)
@@ -224,7 +240,6 @@ class ReddBot:
             print('*DEBUG: {}'.format(debugtext))
 
     def tweet_this(self, msg):
-
         if len(msg) > 140:
             msg = msg[:139]
             self.debug('MSG exceeding 140 characters!!')
