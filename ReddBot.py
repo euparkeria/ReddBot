@@ -75,7 +75,7 @@ class MatchedSubmissions:
         self.keyword = False
         self.submission = dsubmission
         self.target = target
-        # list of checks on each submissions, functions MUST return True or False.
+        # list of checks on each submissions, functions MUST return True or False
         self.checks = [self._find_matching_keywords(self.args),
                        self._detect_brigade(self.args)]
         checks_results = [x for x in self.checks]
