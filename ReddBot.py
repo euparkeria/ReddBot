@@ -10,7 +10,7 @@ from twython import Twython
 watched_subreddit = 'all'
 results_limit = 200
 results_limit_comm = 1000
-bot_agent_names = ['redditlink bot v12']
+bot_agent_name = 'ReddBot v0.8 /u/AntiBrigadeBot'
 loop_timer = 60
 secondary_timer = loop_timer * 10
 DEBUG_LEVEL = 1
@@ -70,15 +70,16 @@ class MatchedSubmissions:
     matching_results = []
 
     def __init__(self, dsubmission, target, keyword_lists):
+        self.args = {'dsubmission': dsubmission, 'target': target, 'keyword_lists': keyword_lists}
         self.is_srs = False
         self.keyword = False
         self.submission = dsubmission
         self.target = target
-        _check_keywords = self._find_matching_keywords(target=target, dsubmission=dsubmission,
-                                                       keywords=keyword_lists['KEYWORDS'])
-        _check_brigade = self._detect_brigade(dsubmission=dsubmission, srs_list=keyword_lists['SRSs'])
-
-        if _check_keywords or _check_brigade:
+        # list of checks on each submissions, functions MUST return True or False.
+        self.checks = [self._find_matching_keywords(self.args),
+                       self._detect_brigade(self.args)]
+        checks_results = [x for x in self.checks]
+        if True in checks_results:
             MatchedSubmissions.matching_results.append(self)
 
     @staticmethod
@@ -88,17 +89,17 @@ class MatchedSubmissions:
         if target == 'comments':
             return dsubmission.body
 
-    def _find_matching_keywords(self, target, dsubmission, keywords):
-        body_text = self._get_text_body(target, dsubmission)
-        for keyword in keywords:
+    def _find_matching_keywords(self, args):
+        body_text = self._get_text_body(args['target'], args['dsubmission'])
+        for keyword in args['keyword_lists']['KEYWORDS']:
             if keyword.lower() in body_text.lower():
                 self.keyword = keyword
                 return True
         return False
 
-    def _detect_brigade(self, dsubmission, srs_list):
-        subreddit = str(dsubmission.subreddit)
-        if subreddit.lower() in srs_list and 'reddit.com' in dsubmission.url and not dsubmission.is_self:
+    def _detect_brigade(self, args):
+        subreddit = str(args['dsubmission'].subreddit)
+        if subreddit.lower() in args['keyword_lists']['SRSs'] and 'reddit.com' in args['dsubmission'].url and not args['dsubmission'].is_self:
             self.is_srs = True
             return True
         return False
@@ -128,7 +129,7 @@ class ReddBot:
         while True:
             self.loop_counter += 1
             if self.loop_counter >= secondary_timer / loop_timer:
-                self.debug('SEDONDARY LOOP')
+                self.debug('Maintenance loop')
                 self.loop_counter = 0
             self._mainlooper()
 
@@ -207,6 +208,7 @@ class ReddBot:
         if result_object.matching_results:
             self.dispatch_nitifications(results_list=result_object.matching_results)
             result_object.empty_list()
+        result_object = False
 
     def dispatch_nitifications(self, results_list):
         for result in results_list:
@@ -216,7 +218,7 @@ class ReddBot:
                 try:
                     s.comments[0].reply('#**NOTICE**: ReddBot detected this '
                                         'comment/thread has been targeted by a downvote'
-                                        ' brigade from [/r/{0}]({1}) \n--------------------\n *{2}* \n\n'
+                                        ' brigade from [/r/{0}]({1}) \n--\n *{2}*'
                                  .format(result.submission.subreddit, result.submission.short_link,
                                          choice(self.redd_data['quotes'])))
                     self.debug('AntiBrigadeBot NOTICE sent')
@@ -250,4 +252,4 @@ class ReddBot:
 
 
 start_time = time.time()
-bot1 = ReddBot(useragent=choice(bot_agent_names), authfilename='ReddAUTH.json', datafilename='ReddData.json')
+bot1 = ReddBot(useragent=bot_agent_name, authfilename='ReddAUTH.json', datafilename='ReddData.json')
