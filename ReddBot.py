@@ -9,7 +9,7 @@ from twython import Twython
 
 watched_subreddit = 'all'
 results_limit = 200
-results_limit_comm = 1000
+results_limit_comm = 600
 bot_agent_name = 'ReddBot v0.8 /u/AntiBrigadeBot'
 loop_timer = 60
 secondary_timer = loop_timer * 10
@@ -75,6 +75,8 @@ class MatchedSubmissions:
         self.keyword = False
         self.submission = dsubmission
         self.target = target
+        self.link = ''  # this is slow so gonna be set only for matching results at dispatch
+
         # list of checks on each submissions, functions MUST return True or False
         self.checks = [self._find_matching_keywords(self.args),
                        self._detect_brigade(self.args)]
@@ -200,37 +202,46 @@ class ReddBot:
         return new_submissions_list
 
     def _contentloop(self, target):
-        result_object = []
-        for new_submission in self._get_new_comments_or_subs(target):
-            result_object = MatchedSubmissions(target=target, dsubmission=new_submission,
-                                               keyword_lists=self.redd_data)
+        new_submissions = self._get_new_comments_or_subs(target)
 
-        if result_object.matching_results:
-            self.dispatch_nitifications(results_list=result_object.matching_results)
-            result_object.empty_list()
-        result_object = False
+        if new_submissions:
+
+            for new_submission in new_submissions:
+                result_object = MatchedSubmissions(target=target, dsubmission=new_submission,
+                                                   keyword_lists=self.redd_data)
+
+            if result_object.matching_results:
+                self.dispatch_nitifications(results_list=result_object.matching_results)
+                result_object.empty_list()
+
 
     def dispatch_nitifications(self, results_list):
         for result in results_list:
             msg = ''
+            if result.target == 'submissions':
+                result.link = result.submission.short_link
+            if result.target == 'comment':
+                result.link = result.submission.permalink
             if result.is_srs:
                 s = self.reddit_session.get_submission(result.submission.url)
                 try:
+
                     s.comments[0].reply('#**NOTICE**: ReddBot detected this '
                                         'comment/thread has been targeted by a downvote'
                                         ' brigade from [/r/{0}]({1}) \n--\n *{2}*'
-                                 .format(result.submission.subreddit, result.submission.short_link,
+                                 .format(result.submission.subreddit, result.link,
                                          choice(self.redd_data['quotes'])))
+
                     self.debug('AntiBrigadeBot NOTICE sent')
                 except:
                     print('Bot Cant post in:{}'.format(result.submission.subreddit))
                 if result.keyword:  # also tweet notification if the srs inludes a keyword
                     msg = 'ATTENTION: possible reactionary brigade from /r/{1} regarding #{0}: {2} #reddit'\
-                        .format(result.keyword, result.submission.subreddit, result.submission.short_link)
+                        .format(result.keyword, result.submission.subreddit, result.link)
 
             elif result.keyword:
                 msg = 'Submission regarding #{0} posted in /r/{1} : {2} #reddit'.format(
-                    result.keyword, result.submission.subreddit, result.submission.short_link)
+                    result.keyword, result.submission.subreddit, result.link)
                 self.debug('New Topic Match in: {}'.format(result.submission.subreddit))
             if msg:
                 self.tweet_this(msg)
@@ -245,7 +256,7 @@ class ReddBot:
             msg = msg[:139]
             self.debug('MSG exceeding 140 characters!!')
         try:
-            self.twitter.update_status(status=msg)
+            #self.twitter.update_status(status=msg)
             self.debug('TWEET SENT!!!')
         except:
             print('ERROR: couldnt update twitter status')
