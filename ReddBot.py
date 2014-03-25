@@ -226,15 +226,16 @@ class ReddBot:
                 s = self.reddit_session.get_submission(result.submission.url)
                 try:
 
-                    s.comments[0].reply('#**NOTICE**: ReddBot detected this '
-                                        'comment/thread has been targeted by a downvote'
-                                        ' brigade from [/r/{0}]({1}) \n--\n *{2}*'
-                                 .format(result.submission.subreddit, result.link,
-                                         choice(self.redd_data['quotes'])))
+                    s.comments[0].reply('#**NOTICE**:\n'
+                                        'ReddBot detected this comment has been targeted by a downvote'
+                                        ' brigade from [/r/{0}]({1})^linked\n\n**Title:**\n\n* *{3}* \n\n---\n *{2}*'
+                                 .format(result.submission.subreddit, result.submission.permalink,
+                                         choice(self.redd_data['quotes']), result.submission.title))
 
                     self.debug('AntiBrigadeBot NOTICE sent')
                 except:
-                    print('Bot Cant post in:{}'.format(result.submission.subreddit))
+                    self._log_this('Bot BANNED in:{}'.format(result.submission.subreddit))
+
                 if result.keyword:  # also tweet notification if the srs inludes a keyword
                     msg = 'ATTENTION: possible reactionary brigade from /r/{1} regarding #{0}: {2} #reddit'\
                         .format(result.keyword, result.submission.subreddit, result.link)
@@ -251,15 +252,26 @@ class ReddBot:
         if level >= 1:
             print('*DEBUG: {}'.format(debugtext))
 
+    def _log_this(self, logtext):
+        with open('LOG.txt', 'a') as logfile:
+            logfile.write('{0}: {1}'.format(time.ctime(), logtext))
+        self.debug('LOOGGED {}'.format(logtext))
+
     def tweet_this(self, msg):
         if len(msg) > 140:
             msg = msg[:139]
             self.debug('MSG exceeding 140 characters!!')
         try:
-            #self.twitter.update_status(status=msg)
+            self.twitter.update_status(status=msg)
             self.debug('TWEET SENT!!!')
         except:
             print('ERROR: couldnt update twitter status')
+
+    def send_pm_to_owner(self, pm_text):
+        try:
+            self.reddit_session.send_message(self.bot_auth_info['REDDIT_PM_TO'], pm_text)
+        except:
+            print('ERROR:Cant send pm')
 
 
 start_time = time.time()
