@@ -128,6 +128,7 @@ class ReddBot:
         self.reddit_session = None
         self.twitter = None
         self.config = ReadConfigFiles()
+        self.already_sent_brigade_notice = []
 
         while True:
             self.loop_counter += 1
@@ -227,10 +228,13 @@ class ReddBot:
                 try:
 
                     s.comments[0].reply('#**NOTICE**:\n'
-                                        'ReddBot detected this comment has been targeted by a downvote'
-                                        ' brigade from [/r/{0}]({1})^linked\n\n**Title:**\n\n* *{3}* \n\n---\n *{2}*'
+                                        'This comment is the target of a possible downvote'
+                                        ' brigade from [/r/{0}]({1})^linked\n\n**Title:**\n\n* *{3}* '
+                                        '\n\n---\n ^★ *{2}* ^★'
                                  .format(result.submission.subreddit, result.submission.permalink,
                                          choice(self.redd_data['quotes']), result.submission.title))
+
+                    self.already_sent_brigade_notice.append(s.id)
 
                     self.debug('AntiBrigadeBot NOTICE sent')
                 except:
@@ -250,7 +254,7 @@ class ReddBot:
     @staticmethod
     def debug(debugtext, level=DEBUG_LEVEL):
         if level >= 1:
-            print('*DEBUG: {}'.format(debugtext))
+            print('* {}'.format(debugtext))
 
     def _log_this(self, logtext):
         with open('LOG.txt', 'a') as logfile:
