@@ -8,8 +8,8 @@ from random import choice
 from twython import Twython
 
 watched_subreddit = 'all'
-results_limit = 200
-results_limit_comm = 600
+results_limit = 500
+results_limit_comm = 900
 bot_agent_name = 'ReddBot v0.8 /u/AntiBrigadeBot'
 loop_timer = 60
 secondary_timer = loop_timer * 10
@@ -72,15 +72,16 @@ class MatchedSubmissions:
     def __init__(self, dsubmission, target, keyword_lists):
         self.args = {'dsubmission': dsubmission, 'target': target, 'keyword_lists': keyword_lists}
         self.is_srs = False
-        self.keyword = False
+        self.keyword_matched = False
         self.submission = dsubmission
         self.target = target
         self.link = ''  # this is slow so gonna be set only for matching results at dispatch
+        self.body_text = self._get_text_body(target, dsubmission)
 
         # list of checks on each submissions, functions MUST return True or False
         self.checks = [self._find_matching_keywords(self.args),
                        self._detect_brigade(self.args)]
-        checks_results = [x for x in self.checks]
+        checks_results = [function for function in self.checks]
         if True in checks_results:
             MatchedSubmissions.matching_results.append(self)
 
@@ -92,22 +93,22 @@ class MatchedSubmissions:
             return dsubmission.body
 
     def _find_matching_keywords(self, args):
-        body_text = self._get_text_body(args['target'], args['dsubmission'])
         for keyword in args['keyword_lists']['KEYWORDS']:
-            if keyword.lower() in body_text.lower():
-                self.keyword = keyword
+            if keyword.lower() in self.body_text.lower():
+                self.keyword_matched = keyword
                 return True
         return False
 
     def _detect_brigade(self, args):
         subreddit = str(args['dsubmission'].subreddit)
-        if subreddit.lower() in args['keyword_lists']['SRSs'] and 'reddit.com' in args['dsubmission'].url and not args['dsubmission'].is_self:
+        if subreddit.lower() in args['keyword_lists']['SRSs'] and 'reddit.com' in args['dsubmission'].url \
+                and not args['dsubmission'].is_self:
             self.is_srs = True
             return True
         return False
 
     @staticmethod
-    def empty_list():
+    def purge_list():
         MatchedSubmissions.matching_results = []
 
 
@@ -212,8 +213,7 @@ class ReddBot:
 
             if result_object.matching_results:
                 self.dispatch_nitifications(results_list=result_object.matching_results)
-                result_object.empty_list()
-
+                result_object.purge_list()
 
     def dispatch_nitifications(self, results_list):
         for result in results_list:
@@ -234,15 +234,15 @@ class ReddBot:
 
                     self.debug('AntiBrigadeBot NOTICE sent')
                 except:
-                    self._log_this('Bot BANNED in:{}'.format(result.submission.subreddit))
+                    self._log_this('Bot BANNED in:{}'.format(s.subreddit))
 
-                if result.keyword:  # also tweet notification if the srs inludes a keyword
+                if result.keyword_matched:  # also tweet notification if the srs inludes a keyword
                     msg = 'ATTENTION: possible reactionary brigade from /r/{1} regarding #{0}: {2} #reddit'\
-                        .format(result.keyword, result.submission.subreddit, result.link)
+                        .format(result.keyword_matched, result.submission.subreddit, result.link)
 
-            elif result.keyword:
+            elif result.keyword_matched:
                 msg = 'Submission regarding #{0} posted in /r/{1} : {2} #reddit'.format(
-                    result.keyword, result.submission.subreddit, result.link)
+                    result.keyword_matched, result.submission.subreddit, result.link)
                 self.debug('New Topic Match in: {}'.format(result.submission.subreddit))
             if msg:
                 self.tweet_this(msg)
@@ -254,7 +254,7 @@ class ReddBot:
 
     def _log_this(self, logtext):
         with open('LOG.txt', 'a') as logfile:
-            logfile.write('{0}: {1}'.format(time.ctime(), logtext))
+            logfile.write('{0}: {1}\n'.format(time.ctime(), logtext))
         self.debug('LOOGGED {}'.format(logtext))
 
     def tweet_this(self, msg):
