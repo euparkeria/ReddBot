@@ -129,6 +129,7 @@ class ReddBot:
         self.twitter = None
         self.config = ReadConfigFiles()
         self.already_sent_brigade_notice = []
+        self.placeholder_id = ''
 
         while True:
             self.loop_counter += 1
@@ -189,7 +190,8 @@ class ReddBot:
 
     def _get_new_comments_or_subs(self, target):
         if target == 'submissions':
-            results = self.reddit_session.get_subreddit(watched_subreddit).get_new(limit=self.pulllimit[target])
+            results = self.reddit_session.get_subreddit(watched_subreddit).get_new(limit=self.pulllimit[target],
+                                                                                   place_holder=self.placeholder_id)
         if target == 'comments':
             results = self.reddit_session.get_comments(watched_subreddit, limit=self.pulllimit[target])
         new_submissions_list = []
@@ -199,6 +201,7 @@ class ReddBot:
                     new_submissions_list.append(submission)
                     self.processed_objects[target].append(submission.id)  # add to list of already processed submission
                     self.cont_num[target] += 1   # count the number of submissions processed each run
+            self.placeholder_id = new_submissions_list[0].id
         except:
             print('ERROR:Cannot connect to reddit!!!')
         return new_submissions_list
@@ -227,12 +230,13 @@ class ReddBot:
                 s = self.reddit_session.get_submission(result.submission.url)
                 try:
 
-                    s.comments[0].reply('#**NOTICE**:\n'
-                                        'This comment is the target of a possible downvote'
-                                        ' brigade from [/r/{0}]({1})^linked\n\n**Title:**\n\n* *{3}* '
-                                        '\n\n---\n ^★ *{2}* ^★'
-                                 .format(result.submission.subreddit, result.submission.permalink,
-                                         choice(self.redd_data['quotes']), result.submission.title))
+                    reply = s.comments[0].reply('#**NOTICE**:\n'
+                                                'This comment is the target of a possible downvote'
+                                                ' brigade from [/r/{0}]({1})^linked\n\n**Title:**\n\n* *{3}* '
+                                                '\n\n---\n ^★ *{2}* ^★'
+                                                .format(result.submission.subreddit, result.submission.permalink,
+                                                        choice(self.redd_data['quotes']), result.submission.title))
+                    self.debug(reply.name)
 
                     self.already_sent_brigade_notice.append(s.id)
 
