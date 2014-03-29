@@ -73,36 +73,48 @@ class MatchedSubmissions:
         self.args = {'dsubmission': dsubmission, 'target': target, 'keyword_lists': keyword_lists}
         self.is_srs = False
         self.keyword_matched = False
-        self.submission = dsubmission
         self.target = target
-        self.link = ''  # this is slow so gonna be set only for matching results at dispatch
-        self.body_text = self._get_text_body(target, dsubmission)
+        self.body_text = self._get_body_text()
+        self.msg_for_tweet = None
+        self.msg_for_reply = None
 
         # list of checks on each submissions, functions MUST return True or False
-        self.checks = [self._find_matching_keywords(self.args),
-                       self._detect_brigade(self.args)]
+        self.checks = [self._find_matching_keywords(),
+                       self._detect_brigade()]
         checks_results = [function for function in self.checks]
         if True in checks_results:
-            MatchedSubmissions.matching_results.append(self)
+            self.link = self._get_link()  # this is slow so gonna be set only for matching results
 
-    @staticmethod
-    def _get_text_body(target, dsubmission):
-        if target == 'submissions':
-            return dsubmission.title + dsubmission.selftext
-        if target == 'comments':
-            return dsubmission.body
+            self.msg_functions_list = [self._brigade_message(),
+                                       self._brigade_tweet(),
+                                       self._keyword_match_message()]
+            build_messages = [msg_function for msg_function in self.msg_functions_list]
+            if True in build_messages:
+                MatchedSubmissions.matching_results.append(self)
 
-    def _find_matching_keywords(self, args):
-        for keyword in args['keyword_lists']['KEYWORDS']:
+    def _get_link(self):
+        if self.args['target'] == 'submissions':
+            return self.args['dsubmission'].short_link
+        if self.args['target'] == 'comments':
+            return self.args['dsubmission'].permalink
+
+    def _get_body_text(self):
+        if self.args['target'] == 'submissions':
+            return self.args['dsubmission'].title + self.args['dsubmission'].selftext
+        if self.args['target'] == 'comments':
+            return self.args['dsubmission']
+
+    def _find_matching_keywords(self):
+        for keyword in self.args['keyword_lists']['KEYWORDS']:
             if keyword.lower() in self.body_text.lower():
                 self.keyword_matched = keyword
                 return True
         return False
 
-    def _detect_brigade(self, args):
-        subreddit = str(args['dsubmission'].subreddit)
-        if subreddit.lower() in args['keyword_lists']['SRSs'] and 'reddit.com' in args['dsubmission'].url \
-                and not args['dsubmission'].is_self:
+    def _detect_brigade(self):
+        subreddit = str(self.args['dsubmission'].subreddit)
+        if subreddit.lower() in self.args['keyword_lists']['SRSs'] and 'reddit.com' in self.args['dsubmission'].url \
+                and not self.args['dsubmission'].is_self:
             self.is_srs = True
             return True
         return False
@@ -110,6 +122,32 @@ class MatchedSubmissions:
     @staticmethod
     def purge_list():
         MatchedSubmissions.matching_results = []
+
+    def _brigade_message(self):
+        if self.is_srs:
+            self.msg_for_reply = "#**NOTICE**:\nThis comment is the target of a possible downvote brigade from " \
+                                 "[/r/{0}]({1})^linked\n\n" \
+                "**Title:**\n\n* *{3}* \n\n---\n ^★ *{2}* ^★".format(self.args['dsubmission'].subreddit,
+                                                                     self.args['dsubmission'].permalink,
+                                                                     choice(self.args['keyword_lists']['quotes']),
+                                                                     self.args['dsubmission'].title)
+            return True
+        return False
+
+    def _keyword_match_message(self):
+        if self.keyword_matched and not self.is_srs:
+            self.msg_for_tweet = 'Submission regarding #{0} posted in /r/{1} : {2} #reddit'.format(
+                self.keyword_matched, self.args['dsubmission'].subreddit, self.link)
+            return True
+        return False
+
+    def _brigade_tweet(self):
+        if self.is_srs and self.keyword_matched:
+            self.msg_for_tweet = 'ATTENTION: possible reactionary brigade from /r/{1} regarding #{0}: {2} #reddit'\
+                .format(self.keyword_matched, self.args['dsubmission'].subreddit, self.link)
+
+            return True
+        return False
 
 
 class ReddBot:
@@ -128,8 +166,8 @@ class ReddBot:
         self.reddit_session = None
         self.twitter = None
         self.config = ReadConfigFiles()
-        self.already_sent_brigade_notice = []
-        self.placeholder_id = ''
+
+        self.placeholder_id = ''  # this doesn't always work !? but it will lower the traffic to some extend
 
         while True:
             self.loop_counter += 1
@@ -181,8 +219,7 @@ class ReddBot:
         if lastpullnum == 0:
             lastpullnum = results_limit / 2   # in case no new results are returned
 
-        res_diff = self.pulllimit[target] - lastpullnum
-        if res_diff == 0:
+        if self.pulllimit[target] - lastpullnum == 0:
             self.pulllimit[target] *= 2
         else:
             self.pulllimit[target] = lastpullnum + add_more[target]
@@ -221,39 +258,18 @@ class ReddBot:
 
     def dispatch_nitifications(self, results_list):
         for result in results_list:
-            msg = ''
-            if result.target == 'submissions':
-                result.link = result.submission.short_link
-            if result.target == 'comment':
-                result.link = result.submission.permalink
-            if result.is_srs:
-                s = self.reddit_session.get_submission(result.submission.url)
+            if result.msg_for_reply:
+                targeted_submission = self.reddit_session.get_submission(result.args['dsubmission'].url)
                 try:
-
-                    reply = s.comments[0].reply('#**NOTICE**:\n'
-                                                'This comment is the target of a possible downvote'
-                                                ' brigade from [/r/{0}]({1})^linked\n\n**Title:**\n\n* *{3}* '
-                                                '\n\n---\n ^★ *{2}* ^★'
-                                                .format(result.submission.subreddit, result.submission.permalink,
-                                                        choice(self.redd_data['quotes']), result.submission.title))
+                    reply = targeted_submission.comments[0].reply(result.msg_for_reply)
                     self.debug(reply.name)
-
-                    self.already_sent_brigade_notice.append(s.id)
-
                     self.debug('AntiBrigadeBot NOTICE sent')
                 except:
-                    self._log_this('Bot BANNED in:{}'.format(s.subreddit))
+                    self._log_this('Bot is BANNED in:{}, cant reply D:'.format(targeted_submission.subreddit))
 
-                if result.keyword_matched:  # also tweet notification if the srs inludes a keyword
-                    msg = 'ATTENTION: possible reactionary brigade from /r/{1} regarding #{0}: {2} #reddit'\
-                        .format(result.keyword_matched, result.submission.subreddit, result.link)
-
-            elif result.keyword_matched:
-                msg = 'Submission regarding #{0} posted in /r/{1} : {2} #reddit'.format(
-                    result.keyword_matched, result.submission.subreddit, result.link)
-                self.debug('New Topic Match in: {}'.format(result.submission.subreddit))
-            if msg:
-                self.tweet_this(msg)
+            if result.msg_for_tweet:
+                self.tweet_this(result.msg_for_tweet)
+                self.debug('New Topic Match in: {}'.format(result.args['dsubmission'].subreddit))
 
     @staticmethod
     def debug(debugtext, level=DEBUG_LEVEL):
