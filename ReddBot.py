@@ -73,7 +73,6 @@ class MatchedSubmissions:
         self.args = {'dsubmission': dsubmission, 'target': target, 'keyword_lists': keyword_lists}
         self.is_srs = False
         self.keyword_matched = False
-        self.target = target
         self.body_text = self._get_body_text()
         self.msg_for_tweet = None
         self.msg_for_reply = None
@@ -85,10 +84,10 @@ class MatchedSubmissions:
         if True in checks_results:
             self.link = self._get_link()  # this is slow so gonna be set only for matching results
 
-            self.msg_functions_list = [self._brigade_message(),
-                                       self._brigade_tweet(),
-                                       self._keyword_match_message()]
-            build_messages = [msg_function for msg_function in self.msg_functions_list]
+            msg_functions_list = [self._brigade_message(),
+                                  self._brigade_tweet(),
+                                  self._keyword_match_tweet()]
+            build_messages = [msg_function for msg_function in msg_functions_list]
             if True in build_messages:
                 MatchedSubmissions.matching_results.append(self)
 
@@ -134,7 +133,7 @@ class MatchedSubmissions:
             return True
         return False
 
-    def _keyword_match_message(self):
+    def _keyword_match_tweet(self):
         if self.keyword_matched and not self.is_srs:
             self.msg_for_tweet = 'Submission regarding #{0} posted in /r/{1} : {2} #reddit'.format(
                 self.keyword_matched, self.args['dsubmission'].subreddit, self.link)
