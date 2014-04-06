@@ -59,7 +59,7 @@ class ReadConfigFiles:
                 redd_data = json.load(f)
                 redd_data['KEYWORDS'] = sorted(redd_data['KEYWORDS'], key=len, reverse=True)
                 redd_data['SRSs'] = [x.lower() for x in redd_data['SRSs']]
-                redd_data['quotes'] = [''.join(('^', x.replace(" ", " ^"))) for x in redd_data['quotes']]
+                #redd_data['quotes'] = [''.join(('^', x.replace(" ", " ^"))) for x in redd_data['quotes']]
         except:
             print("Error reading data file")
         return redd_data
@@ -122,13 +122,62 @@ class MatchedSubmissions:
     def purge_list():
         MatchedSubmissions.matching_results = []
 
+    def _find_good_quote(self, quotes, topicname):
+        quotes_matched = {}
+
+        def remove_punctuation(quote):
+            punctuation = "!\"#$%&'()*+,-.:;<=>?@[\\]^_`{|}~"
+            punct_clear = ""
+            for letter in quote:
+                if letter not in punctuation:
+                    punct_clear += letter
+            return punct_clear.split()
+            #return s_sans_punct
+
+        def longest_common_substring(s1, s2):
+            m = [[0] * (len(s2) + 1) for i in range(len(s1) + 1)]
+            longest, x_longest = 0, 0
+            for x in range(1, len(s1) + 1):
+                for y in range(1, len(s2) + 1):
+                    if s1[x - 1] == s2[y - 1]:
+                        m[x][y] = m[x - 1][y - 1] + 1
+                        if m[x][y] > longest:
+                            longest = m[x][y]
+                            x_longest = x
+                    else:
+                        m[x][y] = 0
+            return s1[x_longest - longest: x_longest]
+
+        topicname = remove_punctuation(topicname.lower())
+        for i in range(len(quotes)):
+            q = remove_punctuation(quotes[i].lower())
+
+            match = ' '.join(longest_common_substring(topicname, q))
+            #match = longest_common_substring(topicname, q)
+            if len(match):
+                quotes_matched[match + "{:.>4}".format(i)] = quotes[i]
+
+        if quotes_matched:
+            keys = list(quotes_matched.keys())
+            longest_keys = []
+            for key in keys:
+                if len(key) == len(max(keys, key=len)):
+                    longest_keys.append(key)
+            print(longest_keys)
+            quote_to_return = quotes_matched[choice(longest_keys)]
+
+        else:
+            quote_to_return = choice(quotes)
+        return ''.join(('^', quote_to_return.replace(" ", " ^")))
+
     def _brigade_message(self):
         if self.is_srs:
+            quote = self._find_good_quote(self.args['keyword_lists']['quotes'], self.args['dsubmission'].title)
             self.msg_for_reply = "#**NOTICE**:\nThis comment is the target of a possible downvote brigade from " \
                                  "[/r/{0}]({1})^linked\n\n" \
                 "**Title:**\n\n* *{3}* \n\n---\n ^★ *{2}* ^★".format(self.args['dsubmission'].subreddit,
                                                                      self.args['dsubmission'].permalink,
-                                                                     choice(self.args['keyword_lists']['quotes']),
+                                                                     quote,
                                                                      self.args['dsubmission'].title)
             return True
         return False
@@ -166,7 +215,7 @@ class ReddBot:
         self.twitter = None
         self.config = ReadConfigFiles()
 
-        self.placeholder_id = ''  # this doesn't always work !? but it will lower the traffic to some extend
+        self.placeholder_id = None  # this doesn't always work !? but it will lower the traffic to some extend
 
         while True:
             self.loop_counter += 1
