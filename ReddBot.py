@@ -132,7 +132,6 @@ class MatchedSubmissions:
                 if letter not in punctuation:
                     punct_clear += letter
             return punct_clear.split()
-            #return s_sans_punct
 
         def longest_common_substring(s1, s2):
             m = [[0] * (len(s2) + 1) for i in range(len(s1) + 1)]
@@ -159,10 +158,7 @@ class MatchedSubmissions:
 
         if quotes_matched:
             keys = list(quotes_matched.keys())
-            longest_keys = []
-            for key in keys:
-                if len(key) == len(max(keys, key=len)):
-                    longest_keys.append(key)
+            longest_keys = [key for key in keys if len(key) == len(max(keys, key=len))]
             print(longest_keys)
             quote_to_return = quotes_matched[choice(longest_keys)]
 
@@ -215,7 +211,7 @@ class ReddBot:
         self.twitter = None
         self.config = ReadConfigFiles()
 
-        self.placeholder_id = None  # this doesn't always work !? but it will lower the traffic to some extend
+        self.placeholder_id = None  # this doesn't always work !? but it will lower the traffic to some extent
 
         while True:
             self.loop_counter += 1
