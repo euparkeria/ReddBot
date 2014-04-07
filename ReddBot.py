@@ -158,7 +158,8 @@ class MatchedSubmissions:
 
         if quotes_matched:
             keys = list(quotes_matched.keys())
-            longest_keys = [key for key in keys if len(key) == len(max(keys, key=len))]
+            longst_key_lenght = len(max(keys, key=len))
+            longest_keys = [key for key in keys if len(key) == longst_key_lenght]
             print(longest_keys)
             quote_to_return = quotes_matched[choice(longest_keys)]
 
