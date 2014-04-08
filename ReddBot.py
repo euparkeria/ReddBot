@@ -64,6 +64,7 @@ class ReadConfigFiles:
             print("Error reading data file")
         return redd_data
 
+
 class WatchedTreads:
     watched_threads_list = []
 
