@@ -65,6 +65,20 @@ class ReadConfigFiles:
         return redd_data
 
 
+class WatchedTreads:
+    watched_threads_list = []
+
+    def __init__(self, thread_url, srs_subreddit, srs_author):
+        self.thread_url = thread_url
+        self.srs_subreddit = srs_subreddit
+        self.srs_author = srs_author
+        self.start_watch_time = time.time()
+        self.processed_comment_ids = []
+        for w in WatchedTreads.watched_threads_list:
+            if self.thread_url not in w.thread_url:
+                WatchedTreads.watched_threads_list.append(self)
+
+
 class MatchedSubmissions:
 
     matching_results = []
@@ -171,7 +185,7 @@ class MatchedSubmissions:
         if self.is_srs:
             quote = self._find_good_quote(self.args['keyword_lists']['quotes'], self.args['dsubmission'].title)
             self.msg_for_reply = "#**NOTICE**:\nThis comment is the target of a possible downvote brigade from " \
-                                 "[/r/{0}]({1})^linked\n\n" \
+                                 "[/r/{0}]({1})^submission ^linked\n\n" \
                 "**Title:**\n\n* *{3}* \n\n---\n ^★ *{2}* ^★".format(self.args['dsubmission'].subreddit,
                                                                      self.args['dsubmission'].permalink,
                                                                      quote,
@@ -218,6 +232,7 @@ class ReddBot:
             self.loop_counter += 1
             if self.loop_counter >= secondary_timer / loop_timer:
                 self.debug('Maintenance loop')
+                print(WatchedTreads.watched_threads_list)
                 self.loop_counter = 0
             self._mainlooper()
 
@@ -307,7 +322,10 @@ class ReddBot:
                 targeted_submission = self.reddit_session.get_submission(result.args['dsubmission'].url)
                 try:
                     reply = targeted_submission.comments[0].reply(result.msg_for_reply)
-                    self.debug(reply.name)
+                    add_thread_to_watch_list = WatchedTreads(thread_url=result.args['dsubmission'].url,
+                                                             srs_subreddit=result.args['dsubmission'].subreddit,
+                                                             srs_author=result.args['dsubmission'].author)
+
                     self.debug('AntiBrigadeBot NOTICE sent')
                 except:
                     self._log_this('Bot is BANNED in:{}, cant reply D:'.format(targeted_submission.subreddit))
