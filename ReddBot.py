@@ -12,7 +12,7 @@ results_limit = 500
 results_limit_comm = 900
 bot_agent_name = 'ReddBot v0.8 /u/AntiBrigadeBot'
 loop_timer = 60
-secondary_timer = loop_timer * 10
+secondary_timer = loop_timer * 5
 DEBUG_LEVEL = 1
 
 
@@ -68,12 +68,13 @@ class ReadConfigFiles:
 class WatchedTreads:
     watched_threads_list = []
 
-    def __init__(self, thread_url, srs_subreddit, srs_author):
+    def __init__(self, thread_url, srs_subreddit, srs_author, bot_reply_object):
         self.thread_url = thread_url
         self.srs_subreddit = srs_subreddit
         self.srs_author = srs_author
         self.start_watch_time = time.time()
         self.processed_comment_ids = []
+        self.bot_reply_object = bot_reply_object
         for w in WatchedTreads.watched_threads_list:
             if self.thread_url not in w.thread_url:
                 WatchedTreads.watched_threads_list.append(self)
@@ -232,7 +233,16 @@ class ReddBot:
             self.loop_counter += 1
             if self.loop_counter >= secondary_timer / loop_timer:
                 self.debug('Maintenance loop')
+
                 print(WatchedTreads.watched_threads_list)
+                for thread in WatchedTreads.watched_threads_list:
+                    submission = self.reddit_sessiond.get_submission(thread.thread_url)
+                    flat_comments = praw.helpers.flatten_tree(submission.comments)
+                    for comment in flat_comments:
+                        user = self.reddit_session.get_redditor(comment.author)
+                        for uc in user.get_comments(limit=10):
+                            print(uc.subreddit)
+
                 self.loop_counter = 0
             self._mainlooper()
 
@@ -309,7 +319,8 @@ class ReddBot:
         if new_submissions:
 
             for new_submission in new_submissions:
-                result_object = MatchedSubmissions(target=target, dsubmission=new_submission,
+                result_object = MatchedSubmissions(target=target,
+                                                   dsubmission=new_submission,
                                                    keyword_lists=self.redd_data)
 
             if result_object.matching_results:
@@ -322,13 +333,14 @@ class ReddBot:
                 targeted_submission = self.reddit_session.get_submission(result.args['dsubmission'].url)
                 try:
                     reply = targeted_submission.comments[0].reply(result.msg_for_reply)
-                    add_thread_to_watch_list = WatchedTreads(thread_url=result.args['dsubmission'].url,
-                                                             srs_subreddit=result.args['dsubmission'].subreddit,
-                                                             srs_author=result.args['dsubmission'].author)
+                    add_thread_to_watchlist = WatchedTreads(thread_url=result.args['dsubmission'].url,
+                                                            srs_subreddit=result.args['dsubmission'].subreddit,
+                                                            srs_author=result.args['dsubmission'].author,
+                                                            bot_reply_object=reply)
 
                     self.debug('AntiBrigadeBot NOTICE sent')
                 except:
-                    self._log_this('Bot is BANNED in:{}, cant reply D:'.format(targeted_submission.subreddit))
+                    self._log_this('Bot is BANNED in:{}, cant reply ):'.format(targeted_submission.subreddit))
 
             if result.msg_for_tweet:
                 self.tweet_this(result.msg_for_tweet)
