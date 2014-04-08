@@ -12,7 +12,7 @@ results_limit = 500
 results_limit_comm = 900
 bot_agent_name = 'ReddBot v0.8 /u/AntiBrigadeBot'
 loop_timer = 60
-secondary_timer = loop_timer * 5
+secondary_timer = loop_timer * 3
 DEBUG_LEVEL = 1
 
 
@@ -73,11 +73,10 @@ class WatchedTreads:
         self.srs_subreddit = srs_subreddit
         self.srs_author = srs_author
         self.start_watch_time = time.time()
-        self.processed_comment_ids = []
+        self.already_processed_users = []
         self.bot_reply_object = bot_reply_object
-        for w in WatchedTreads.watched_threads_list:
-            if self.thread_url not in w.thread_url:
-                WatchedTreads.watched_threads_list.append(self)
+        self.bot_reply_body = self.bot_reply_object.body
+        WatchedTreads.watched_threads_list.append(self)
 
 
 class MatchedSubmissions:
@@ -187,10 +186,12 @@ class MatchedSubmissions:
             quote = self._find_good_quote(self.args['keyword_lists']['quotes'], self.args['dsubmission'].title)
             self.msg_for_reply = "#**NOTICE**:\nThis comment is the target of a possible downvote brigade from " \
                                  "[/r/{0}]({1})^submission ^linked\n\n" \
-                "**Title:**\n\n* *{3}* \n\n---\n ^★ *{2}* ^★".format(self.args['dsubmission'].subreddit,
-                                                                     self.args['dsubmission'].permalink,
-                                                                     quote,
-                                                                     self.args['dsubmission'].title)
+                "**Title:**\n\n* *{3}*\n\n**Members of /r/{0} involved in this thread:**\n\n" \
+                "^updated ^every ^5 ^minutes\n\n\n \n\n-----\n ^★ *{2}* ^★"\
+                .format(self.args['dsubmission'].subreddit,
+                self.args['dsubmission'].permalink,
+                quote,
+                self.args['dsubmission'].title)
             return True
         return False
 
@@ -235,13 +236,27 @@ class ReddBot:
                 self.debug('Maintenance loop')
 
                 print(WatchedTreads.watched_threads_list)
+                split_mark = '\n\n-----\n'
                 for thread in WatchedTreads.watched_threads_list:
-                    submission = self.reddit_sessiond.get_submission(thread.thread_url)
-                    flat_comments = praw.helpers.flatten_tree(submission.comments)
-                    for comment in flat_comments:
-                        user = self.reddit_session.get_redditor(comment.author)
-                        for uc in user.get_comments(limit=10):
-                            print(uc.subreddit)
+                    srs_users = []
+                    submission = self.reddit_session.get_submission(thread.thread_url)
+                    for comment in praw.helpers.flatten_tree(submission.comments):
+                        author = str(comment.author)
+                        if author not in thread.already_processed_users:
+                            user = self.reddit_session.get_redditor(author)
+                            for usercomment in user.get_comments(limit=100):
+                                subreddit = str(usercomment.subreddit)
+                                if subreddit == thread.srs_subreddit and author not in srs_users:
+                                    srs_users.append(author)
+                            thread.already_processed_users.append(author)
+                    if srs_users:
+                        bot_comment_body = thread.bot_reply_body
+                        splitted_comment = bot_comment_body.split(split_mark, 1)
+                        new_lines = ['\n\n* /u/' + user for user in srs_users]
+                        new_string = ''.join(new_lines)
+                        rebuild_comment = splitted_comment[0] + new_string + split_mark + splitted_comment[1]
+                        thread.bot_reply_body = rebuild_comment
+                        thread.bot_reply_object.edit(rebuild_comment)
 
                 self.loop_counter = 0
             self._mainlooper()
@@ -334,8 +349,8 @@ class ReddBot:
                 try:
                     reply = targeted_submission.comments[0].reply(result.msg_for_reply)
                     add_thread_to_watchlist = WatchedTreads(thread_url=result.args['dsubmission'].url,
-                                                            srs_subreddit=result.args['dsubmission'].subreddit,
-                                                            srs_author=result.args['dsubmission'].author,
+                                                            srs_subreddit=str(result.args['dsubmission'].subreddit),
+                                                            srs_author=str(result.args['dsubmission'].author),
                                                             bot_reply_object=reply)
 
                     self.debug('AntiBrigadeBot NOTICE sent')
