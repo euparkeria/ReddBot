@@ -12,7 +12,7 @@ results_limit = 500
 results_limit_comm = 900
 bot_agent_name = 'ReddBot v0.8 /u/AntiBrigadeBot'
 loop_timer = 60
-secondary_timer = loop_timer * 3
+secondary_timer = loop_timer * 5
 DEBUG_LEVEL = 1
 
 
@@ -77,6 +77,7 @@ class WatchedTreads:
         self.bot_reply_object = bot_reply_object
         self.bot_reply_body = self.bot_reply_object.body
         WatchedTreads.watched_threads_list.append(self)
+        print('new watch object added')
 
 
 class MatchedSubmissions:
@@ -145,7 +146,8 @@ class MatchedSubmissions:
             for letter in quote:
                 if letter not in punctuation:
                     punct_clear += letter
-            return punct_clear.split()
+            #return punct_clear.split()
+            return punct_clear
 
         def longest_common_substring(s1, s2):
             m = [[0] * (len(s2) + 1) for i in range(len(s1) + 1)]
@@ -165,8 +167,8 @@ class MatchedSubmissions:
         for i in range(len(quotes)):
             q = remove_punctuation(quotes[i].lower())
 
-            match = ' '.join(longest_common_substring(topicname, q))
-            #match = longest_common_substring(topicname, q)
+            #match = ' '.join(longest_common_substring(topicname, q))
+            match = longest_common_substring(topicname, q)
             if len(match):
                 quotes_matched[match + "{:.>4}".format(i)] = quotes[i]
 
@@ -187,7 +189,7 @@ class MatchedSubmissions:
             self.msg_for_reply = "#**NOTICE**:\nThis comment is the target of a possible downvote brigade from " \
                                  "[/r/{0}]({1})^submission ^linked\n\n" \
                 "**Title:**\n\n* *{3}*\n\n**Members of /r/{0} involved in this thread:**\n\n" \
-                "^updated ^every ^5 ^minutes\n\n\n \n\n-----\n ^★ *{2}* ^★"\
+                "^list ^updated ^every ^5 ^minutes\n\n\n \n\n-----\n ^★ *{2}* ^★"\
                 .format(self.args['dsubmission'].subreddit,
                 self.args['dsubmission'].permalink,
                 quote,
@@ -235,31 +237,47 @@ class ReddBot:
             if self.loop_counter >= secondary_timer / loop_timer:
                 self.debug('Maintenance loop')
 
-                print(WatchedTreads.watched_threads_list)
-                split_mark = '\n\n-----\n'
-                for thread in WatchedTreads.watched_threads_list:
-                    srs_users = []
-                    submission = self.reddit_session.get_submission(thread.thread_url)
-                    for comment in praw.helpers.flatten_tree(submission.comments):
-                        author = str(comment.author)
-                        if author not in thread.already_processed_users:
-                            user = self.reddit_session.get_redditor(author)
-                            for usercomment in user.get_comments(limit=100):
-                                subreddit = str(usercomment.subreddit)
-                                if subreddit == thread.srs_subreddit and author not in srs_users:
-                                    srs_users.append(author)
-                            thread.already_processed_users.append(author)
-                    if srs_users:
-                        bot_comment_body = thread.bot_reply_body
-                        splitted_comment = bot_comment_body.split(split_mark, 1)
-                        new_lines = ['\n\n* /u/' + user for user in srs_users]
-                        new_string = ''.join(new_lines)
-                        rebuild_comment = splitted_comment[0] + new_string + split_mark + splitted_comment[1]
-                        thread.bot_reply_body = rebuild_comment
-                        thread.bot_reply_object.edit(rebuild_comment)
+                for function in self._maintenance_functions():
+                    function()
 
                 self.loop_counter = 0
             self._mainlooper()
+
+    def _maintenance_functions(self):
+        def watchthreads():
+            print(WatchedTreads.watched_threads_list)
+            split_mark = '\n\n-----\n'
+            for thread in WatchedTreads.watched_threads_list:
+                now = time.time()
+                srs_users = []
+                submission = self.reddit_session.get_submission(thread.thread_url)
+                print(thread.thread_url)
+                for comment in praw.helpers.flatten_tree(submission.comments):
+                    author = str(comment.author)
+                    print(author)
+                    if author and author not in thread.already_processed_users:
+                        user = self.reddit_session.get_redditor(author)
+                        for usercomment in user.get_comments(limit=150):
+                            subreddit = str(usercomment.subreddit)
+                            if subreddit == thread.srs_subreddit and author not in srs_users:
+                                srs_users.append(author)
+                        thread.already_processed_users.append(author)
+                        print(thread.already_processed_users)
+                if srs_users:
+                    splitted_comment = thread.bot_reply_body.split(split_mark, 1)
+                    srs_users_lines = ''.join(['\n\n* /u/' + user for user in srs_users])
+                    thread.bot_reply_body = splitted_comment[0] + srs_users_lines + split_mark + splitted_comment[1]
+                    try:
+                        thread.bot_reply_object.edit(thread.bot_reply_body)
+                    except:
+                        self.debug('ERROR: Cant edit brigade comment')
+
+                if now - thread.start_watch_time > 21600:  # if older than 6 hours
+                    WatchedTreads.watched_threads_list.remove(thread)
+                    self.debug('Watched Thread Removed!')
+                self.debug(time.time() - now)
+
+        return [watchthreads]
 
     def _mainlooper(self):
 
@@ -299,7 +317,7 @@ class ReddBot:
 
     def _calculate_pull_limit(self, lastpullnum, target):
         """this needs to be done better"""
-        add_more = {'submissions': 80, 'comments': 300}   # how many items above last pull number to pull next run
+        add_more = {'submissions': 100, 'comments': 300}   # how many items above last pull number to pull next run
 
         if lastpullnum == 0:
             lastpullnum = results_limit / 2   # in case no new results are returned
