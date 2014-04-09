@@ -8,12 +8,12 @@ import pickle
 from random import choice
 from twython import Twython
 
-watched_subreddit = 'all'
+watched_subreddit = 'test123456780'
 results_limit = 500
 results_limit_comm = 900
 bot_agent_name = 'ReddBot v0.8 /u/AntiBrigadeBot'
 loop_timer = 60
-secondary_timer = loop_timer * 5
+secondary_timer = loop_timer * 3
 DEBUG_LEVEL = 1
 
 
@@ -256,9 +256,8 @@ class ReddBot:
                 print(thread.thread_url)
                 for comment in praw.helpers.flatten_tree(submission.comments):
                     author = str(comment.author)
-                    print(author)
                     if author and author not in thread.already_processed_users \
-                            and author is not self.redd_data['REDDIT_BOT_USERNAME']:
+                            and author not in self.bot_auth_info['REDDIT_BOT_USERNAME']:
                         user = self.reddit_session.get_redditor(author)
                         for usercomment in user.get_comments(limit=150):
                             subreddit = str(usercomment.subreddit)
@@ -347,7 +346,8 @@ class ReddBot:
                     new_submissions_list.append(submission)
                     self.processed_objects[target].append(submission.id)  # add to list of already processed submission
                     self.cont_num[target] += 1   # count the number of submissions processed each run
-            self.placeholder_id = new_submissions_list[0].id
+            if new_submissions_list:
+                self.placeholder_id = new_submissions_list[0].id
         except:
             print('ERROR:Cannot connect to reddit!!!')
         return new_submissions_list
@@ -366,17 +366,19 @@ class ReddBot:
                 self.dispatch_nitifications(results_list=result_object.matching_results)
                 result_object.purge_list()
 
+    @staticmethod
+    def commenter(obj, msg):
+        if len(obj.comments) > 1:
+            return obj.add_comment(msg)
+        else:
+            return obj.comments[0].reply(msg)
+
     def dispatch_nitifications(self, results_list):
         for result in results_list:
             if result.msg_for_reply:
                 targeted_submission = self.reddit_session.get_submission(result.args['dsubmission'].url)
-                if len(targeted_submission.comments) > 1:
-                    thread_or_root_reply_object = targeted_submission
-                else:
-                    thread_or_root_reply_object = targeted_submission.comments[0]
-
                 try:
-                    reply = thread_or_root_reply_object.reply(result.msg_for_reply)
+                    reply = self.commenter(obj=targeted_submission, msg=result.msg_for_reply )
                     add_thread_to_watchlist = WatchedTreads(thread_url=result.args['dsubmission'].url,
                                                             srs_subreddit=str(result.args['dsubmission'].subreddit),
                                                             srs_author=str(result.args['dsubmission'].author),
