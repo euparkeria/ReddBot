@@ -8,12 +8,12 @@ import pickle
 from random import choice
 from twython import Twython
 
-watched_subreddit = 'test123456780'
+watched_subreddit = 'all'
 results_limit = 500
 results_limit_comm = 900
 bot_agent_name = 'ReddBot v0.8 /u/AntiBrigadeBot'
 loop_timer = 60
-secondary_timer = loop_timer * 3
+secondary_timer = loop_timer * 5
 DEBUG_LEVEL = 1
 
 
