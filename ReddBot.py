@@ -264,7 +264,7 @@ class ReddBot:
                             if subreddit == thread.srs_subreddit and author not in srs_users:
                                 srs_users.append(author)
                         thread.already_processed_users.append(author)
-                        print(thread.already_processed_users)
+                print(thread.already_processed_users)
                 if srs_users:
                     splitted_comment = thread.bot_reply_body.split(split_mark, 1)
                     srs_users_lines = ''.join(['\n\n* /u/' + user for user in srs_users])
