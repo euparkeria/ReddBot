@@ -46,12 +46,21 @@ class ConnectSocialMedia:
 class ReadConfigFiles:
     def __init__(self):
         self.data_modified_time = 0
+        WatchedTreads.watched_threads_list = self.loadcache()
 
     @staticmethod
     def readauthfile(authfilename):
         with open(authfilename, 'r', encoding='utf-8') as f:
             bot_auth_info = json.load(f)
         return bot_auth_info
+
+    @staticmethod
+    def loadcache():
+        try:
+            with open('reddbot.cache', 'rb') as f:
+                return pickle.load(f)
+        except:
+            print('Cache File not Pressent')
 
     def readdatafile(self, datafilename):
         try:
