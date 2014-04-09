@@ -4,6 +4,7 @@ import time
 import praw
 import json
 import os
+import pickle
 from random import choice
 from twython import Twython
 
@@ -251,11 +252,13 @@ class ReddBot:
                 now = time.time()
                 srs_users = []
                 submission = self.reddit_session.get_submission(thread.thread_url)
+                submission.replace_more_comments(limit=6, threshold=1)
                 print(thread.thread_url)
                 for comment in praw.helpers.flatten_tree(submission.comments):
                     author = str(comment.author)
                     print(author)
-                    if author and author not in thread.already_processed_users:
+                    if author and author not in thread.already_processed_users \
+                            and author is not self.redd_data['REDDIT_BOT_USERNAME']:
                         user = self.reddit_session.get_redditor(author)
                         for usercomment in user.get_comments(limit=150):
                             subreddit = str(usercomment.subreddit)
@@ -276,6 +279,9 @@ class ReddBot:
                     WatchedTreads.watched_threads_list.remove(thread)
                     self.debug('Watched Thread Removed!')
                 self.debug(time.time() - now)
+            CACHE_FILE = 'reddbot.cache'
+            with open(CACHE_FILE, 'wb') as fa:
+                pickle.dump(WatchedTreads.watched_threads_list, fa)
 
         return [watchthreads]
 
@@ -364,8 +370,13 @@ class ReddBot:
         for result in results_list:
             if result.msg_for_reply:
                 targeted_submission = self.reddit_session.get_submission(result.args['dsubmission'].url)
+                if len(targeted_submission.comments) > 1:
+                    thread_or_root_reply_object = targeted_submission
+                else:
+                    thread_or_root_reply_object = targeted_submission.comments[0]
+
                 try:
-                    reply = targeted_submission.comments[0].reply(result.msg_for_reply)
+                    reply = thread_or_root_reply_object.reply(result.msg_for_reply)
                     add_thread_to_watchlist = WatchedTreads(thread_url=result.args['dsubmission'].url,
                                                             srs_subreddit=str(result.args['dsubmission'].subreddit),
                                                             srs_author=str(result.args['dsubmission'].author),
