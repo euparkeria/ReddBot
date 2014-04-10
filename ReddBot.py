@@ -13,7 +13,7 @@ results_limit = 500
 results_limit_comm = 900
 bot_agent_name = 'ReddBot v0.8 /u/AntiBrigadeBot'
 loop_timer = 60
-secondary_timer = loop_timer * 5
+secondary_timer = loop_timer * 3
 DEBUG_LEVEL = 1
 
 
@@ -46,7 +46,9 @@ class ConnectSocialMedia:
 class ReadConfigFiles:
     def __init__(self):
         self.data_modified_time = 0
-        WatchedTreads.watched_threads_list = self.loadcache()
+        cache = self.loadcache()
+        if cache:
+            WatchedTreads.watched_threads_list = cache
 
     @staticmethod
     def readauthfile(authfilename):
@@ -58,9 +60,11 @@ class ReadConfigFiles:
     def loadcache():
         try:
             with open('reddbot.cache', 'rb') as f:
-                return pickle.load(f)
+                entry = pickle.load(f)
+            return entry
         except:
             print('Cache File not Pressent')
+            return False
 
     def readdatafile(self, datafilename):
         try:
@@ -78,14 +82,14 @@ class ReadConfigFiles:
 class WatchedTreads:
     watched_threads_list = []
 
-    def __init__(self, thread_url, srs_subreddit, srs_author, bot_reply_object):
+    def __init__(self, thread_url, srs_subreddit, srs_author, bot_reply_object_id, bot_reply_body):
         self.thread_url = thread_url
         self.srs_subreddit = srs_subreddit
         self.srs_author = srs_author
         self.start_watch_time = time.time()
         self.already_processed_users = []
-        self.bot_reply_object = bot_reply_object
-        self.bot_reply_body = self.bot_reply_object.body
+        self.bot_reply_object_id = bot_reply_object_id
+        self.bot_reply_body = bot_reply_body
         WatchedTreads.watched_threads_list.append(self)
         print('new watch object added')
 
@@ -196,7 +200,7 @@ class MatchedSubmissions:
     def _brigade_message(self):
         if self.is_srs:
             quote = self._find_good_quote(self.args['keyword_lists']['quotes'], self.args['dsubmission'].title)
-            self.msg_for_reply = "#**NOTICE**:\nThis comment is the target of a possible downvote brigade from " \
+            self.msg_for_reply = "#**NOTICE**:\nThis thread is the target of a possible downvote brigade from " \
                                  "[/r/{0}]({1})^submission ^linked\n\n" \
                 "**Title:**\n\n* *{3}*\n\n**Members of /r/{0} involved in this thread:**\n\n" \
                 "^list ^updated ^every ^5 ^minutes\n\n\n \n\n-----\n ^★ *{2}* ^★"\
@@ -246,9 +250,11 @@ class ReddBot:
             self.loop_counter += 1
             if self.loop_counter >= secondary_timer / loop_timer:
                 self.debug('Maintenance loop')
-
-                for function in self._maintenance_functions():
-                    function()
+                try:
+                    for function in self._maintenance_functions():
+                        function()
+                except:
+                    self.debug('Maintenance Loop Error')
 
                 self.loop_counter = 0
             self._mainlooper()
@@ -268,6 +274,7 @@ class ReddBot:
                     if author and author not in thread.already_processed_users \
                             and author not in self.bot_auth_info['REDDIT_BOT_USERNAME']:
                         user = self.reddit_session.get_redditor(author)
+                        print(author)
                         for usercomment in user.get_comments(limit=150):
                             subreddit = str(usercomment.subreddit)
                             if subreddit == thread.srs_subreddit and author not in srs_users:
@@ -279,7 +286,8 @@ class ReddBot:
                     srs_users_lines = ''.join(['\n\n* /u/' + user for user in srs_users])
                     thread.bot_reply_body = splitted_comment[0] + srs_users_lines + split_mark + splitted_comment[1]
                     try:
-                        thread.bot_reply_object.edit(thread.bot_reply_body)
+                        comment = self.reddit_session.get_info(thing_id=thread.bot_reply_object_id)
+                        comment.edit(thread.bot_reply_body)
                     except:
                         self.debug('ERROR: Cant edit brigade comment')
 
@@ -287,8 +295,8 @@ class ReddBot:
                     WatchedTreads.watched_threads_list.remove(thread)
                     self.debug('Watched Thread Removed!')
                 self.debug(time.time() - now)
-            CACHE_FILE = 'reddbot.cache'
-            with open(CACHE_FILE, 'wb') as fa:
+            cachefile = 'reddbot.cache'
+            with open(cachefile, 'wb') as fa:
                 pickle.dump(WatchedTreads.watched_threads_list, fa)
 
         return [watchthreads]
@@ -387,11 +395,12 @@ class ReddBot:
             if result.msg_for_reply:
                 targeted_submission = self.reddit_session.get_submission(result.args['dsubmission'].url)
                 try:
-                    reply = self.commenter(obj=targeted_submission, msg=result.msg_for_reply )
+                    reply = self.commenter(obj=targeted_submission, msg=result.msg_for_reply)
                     add_thread_to_watchlist = WatchedTreads(thread_url=result.args['dsubmission'].url,
                                                             srs_subreddit=str(result.args['dsubmission'].subreddit),
                                                             srs_author=str(result.args['dsubmission'].author),
-                                                            bot_reply_object=reply)
+                                                            bot_reply_object_id=reply.name,
+                                                            bot_reply_body=reply.body)
 
                     self.debug('AntiBrigadeBot NOTICE sent')
                 except:
