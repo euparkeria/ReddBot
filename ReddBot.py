@@ -11,7 +11,7 @@ from twython import Twython
 watched_subreddit = 'all'
 results_limit = 400
 results_limit_comm = 900
-bot_agent_name = 'brigade bot 1.0'
+bot_agent_name = 'antibrigadebot 2.0'
 loop_timer = 60
 secondary_timer = loop_timer * 5
 DEBUG_LEVEL = 1
