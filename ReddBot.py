@@ -9,11 +9,11 @@ from random import choice
 from twython import Twython
 
 watched_subreddit = 'all'
-results_limit = 500
+results_limit = 400
 results_limit_comm = 900
-bot_agent_name = 'ReddBot v0.8 /u/AntiBrigadeBot'
+bot_agent_name = 'brigade bot 1.0'
 loop_timer = 60
-secondary_timer = loop_timer * 3
+secondary_timer = loop_timer * 5
 DEBUG_LEVEL = 1
 
 
@@ -90,8 +90,19 @@ class WatchedTreads:
         self.already_processed_users = []
         self.bot_reply_object_id = bot_reply_object_id
         self.bot_reply_body = bot_reply_body
+
         WatchedTreads.watched_threads_list.append(self)
+        self.savecache()
         print('new watch object added')
+
+    @staticmethod
+    def savecache():
+        try:
+            cachefile = 'reddbot.cache'
+            with open(cachefile, 'wb') as fa:
+                pickle.dump(WatchedTreads.watched_threads_list, fa)
+        except:
+            print('ERROR: Cant write cache file')
 
 
 class MatchedSubmissions:
@@ -108,7 +119,7 @@ class MatchedSubmissions:
 
         # list of checks on each submissions, functions MUST return True or False
         self.checks = [self._find_matching_keywords(),
-                       self._detect_brigade()]
+                       self._detect_brigade()]  #  self._detect_brigade(), self._find_matching_keywords()
         checks_results = [function for function in self.checks]
         if True in checks_results:
             self.link = self._get_link()  # this is slow so gonna be set only for matching results
@@ -151,7 +162,8 @@ class MatchedSubmissions:
     def purge_list():
         MatchedSubmissions.matching_results = []
 
-    def _find_good_quote(self, quotes, topicname):
+    @staticmethod
+    def _find_good_quote(quotes, topicname):
         quotes_matched = {}
 
         def remove_punctuation(quote):
@@ -202,8 +214,8 @@ class MatchedSubmissions:
             quote = self._find_good_quote(self.args['keyword_lists']['quotes'], self.args['dsubmission'].title)
             self.msg_for_reply = "#**NOTICE**:\nThis thread is the target of a possible downvote brigade from " \
                                  "[/r/{0}]({1})^submission ^linked\n\n" \
-                "**Title:**\n\n* *{3}*\n\n**Members of /r/{0} involved in this thread:**\n\n" \
-                "^list ^updated ^every ^5 ^minutes\n\n\n \n\n-----\n ^★ *{2}* ^★"\
+                "**Submission Title:**\n\n* *{3}*\n\n**Members of /r/{0} involved in this thread:**" \
+                "^list ^updated ^every ^5 ^minutes\n\n \n\n-----\n ^★*{2}*^★"\
                 .format(self.args['dsubmission'].subreddit,
                 self.args['dsubmission'].permalink,
                 quote,
@@ -283,7 +295,7 @@ class ReddBot:
                 print(thread.already_processed_users)
                 if srs_users:
                     splitted_comment = thread.bot_reply_body.split(split_mark, 1)
-                    srs_users_lines = ''.join(['\n\n* /u/' + user for user in srs_users])
+                    srs_users_lines = ''.join(['\n\n* ' + user for user in srs_users])
                     thread.bot_reply_body = splitted_comment[0] + srs_users_lines + split_mark + splitted_comment[1]
                     try:
                         comment = self.reddit_session.get_info(thing_id=thread.bot_reply_object_id)
@@ -295,9 +307,7 @@ class ReddBot:
                     WatchedTreads.watched_threads_list.remove(thread)
                     self.debug('Watched Thread Removed!')
                 self.debug(time.time() - now)
-            cachefile = 'reddbot.cache'
-            with open(cachefile, 'wb') as fa:
-                pickle.dump(WatchedTreads.watched_threads_list, fa)
+            WatchedTreads.savecache()
 
         return [watchthreads]
 
@@ -396,6 +406,7 @@ class ReddBot:
                 targeted_submission = self.reddit_session.get_submission(result.args['dsubmission'].url)
                 try:
                     reply = self.commenter(obj=targeted_submission, msg=result.msg_for_reply)
+                    #reply = targeted_submission.comments[0].reply(result.msg_for_reply)
                     add_thread_to_watchlist = WatchedTreads(thread_url=result.args['dsubmission'].url,
                                                             srs_subreddit=str(result.args['dsubmission'].subreddit),
                                                             srs_author=str(result.args['dsubmission'].author),
