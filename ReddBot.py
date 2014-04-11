@@ -215,7 +215,7 @@ class MatchedSubmissions:
             self.msg_for_reply = "#**NOTICE**:\nThis thread is the target of a possible downvote brigade from " \
                                  "[/r/{0}]({1})^submission ^linked\n\n" \
                 "**Submission Title:**\n\n* *{3}*\n\n**Members of *{0}* involved in this thread:**" \
-                "^list ^updated ^every ^5 ^minutes\n\n \n\n-----\n ^★*{2}*^★"\
+                "^list ^updated ^every ^5 ^minutes\n\n \n\n-----\n ^★ *{2}* ^★"\
                 .format(self.args['dsubmission'].subreddit,
                 self.args['dsubmission'].permalink,
                 quote,
