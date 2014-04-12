@@ -104,6 +104,48 @@ class WatchedTreads:
         except:
             print('ERROR: Cant write cache file')
 
+    @staticmethod
+    def update(reddit_session, botusername):
+        print(WatchedTreads.watched_threads_list)
+        split_mark = '\n\n-----\n'
+
+        def check_user_comments(limit):
+            if author and author not in thread.already_processed_users and author not in botusername:
+                user = reddit_session.get_redditor(author)
+                print(author)
+                for usercomment in user.get_comments(limit=limit):
+                    subreddit = str(usercomment.subreddit)
+                    if subreddit == thread.srs_subreddit and author not in srs_users:
+                        srs_users.append(author)
+                thread.already_processed_users.append(author)
+
+        for thread in WatchedTreads.watched_threads_list:
+            now = time.time()
+            srs_users = []
+            submission = reddit_session.get_submission(thread.thread_url)
+            submission.replace_more_comments(limit=3, threshold=1)
+            print(thread.thread_url)
+            for comment in praw.helpers.flatten_tree(submission.comments):
+                author = str(comment.author)
+                check_user_comments(limit=150)
+
+            print(thread.already_processed_users)
+            if srs_users:
+                splitted_comment = thread.bot_reply_body.split(split_mark, 1)
+                srs_users_lines = ''.join(['\n\n* ' + user for user in srs_users])
+                thread.bot_reply_body = splitted_comment[0] + srs_users_lines + split_mark + splitted_comment[1]
+                try:
+                    comment = reddit_session.get_info(thing_id=thread.bot_reply_object_id)
+                    comment.edit(thread.bot_reply_body)
+                except:
+                    print('ERROR: Cant edit brigade comment')
+
+            if now - thread.start_watch_time > 21600:  # if older than 6 hours
+                WatchedTreads.watched_threads_list.remove(thread)
+                print('Watched Thread Removed!')
+            print(time.time() - now)
+        WatchedTreads.savecache()
+
 
 class MatchedSubmissions:
 
@@ -273,41 +315,8 @@ class ReddBot:
 
     def _maintenance_functions(self):
         def watchthreads():
-            print(WatchedTreads.watched_threads_list)
-            split_mark = '\n\n-----\n'
-            for thread in WatchedTreads.watched_threads_list:
-                now = time.time()
-                srs_users = []
-                submission = self.reddit_session.get_submission(thread.thread_url)
-                submission.replace_more_comments(limit=6, threshold=1)
-                print(thread.thread_url)
-                for comment in praw.helpers.flatten_tree(submission.comments):
-                    author = str(comment.author)
-                    if author and author not in thread.already_processed_users \
-                            and author not in self.bot_auth_info['REDDIT_BOT_USERNAME']:
-                        user = self.reddit_session.get_redditor(author)
-                        print(author)
-                        for usercomment in user.get_comments(limit=150):
-                            subreddit = str(usercomment.subreddit)
-                            if subreddit == thread.srs_subreddit and author not in srs_users:
-                                srs_users.append(author)
-                        thread.already_processed_users.append(author)
-                print(thread.already_processed_users)
-                if srs_users:
-                    splitted_comment = thread.bot_reply_body.split(split_mark, 1)
-                    srs_users_lines = ''.join(['\n\n* ' + user for user in srs_users])
-                    thread.bot_reply_body = splitted_comment[0] + srs_users_lines + split_mark + splitted_comment[1]
-                    try:
-                        comment = self.reddit_session.get_info(thing_id=thread.bot_reply_object_id)
-                        comment.edit(thread.bot_reply_body)
-                    except:
-                        self.debug('ERROR: Cant edit brigade comment')
-
-                if now - thread.start_watch_time > 21600:  # if older than 6 hours
-                    WatchedTreads.watched_threads_list.remove(thread)
-                    self.debug('Watched Thread Removed!')
-                self.debug(time.time() - now)
-            WatchedTreads.savecache()
+            WatchedTreads.update(reddit_session=self.reddit_session,
+                                 botusername=self.bot_auth_info['REDDIT_BOT_USERNAME'])
 
         return [watchthreads]
 
