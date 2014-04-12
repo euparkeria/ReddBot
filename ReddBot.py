@@ -8,7 +8,7 @@ import pickle
 from random import choice
 from twython import Twython
 
-watched_subreddit = 'all'
+watched_subreddit = 'test123456780'
 results_limit = 400
 results_limit_comm = 900
 bot_agent_name = 'antibrigadebot 2.0'
