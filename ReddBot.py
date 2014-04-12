@@ -109,16 +109,6 @@ class WatchedTreads:
         print(WatchedTreads.watched_threads_list)
         split_mark = '\n\n-----\n'
 
-        def check_user_comments(limit):
-            if author and author not in thread.already_processed_users and author not in botusername:
-                user = reddit_session.get_redditor(author)
-                print(author)
-                for usercomment in user.get_comments(limit=limit):
-                    subreddit = str(usercomment.subreddit)
-                    if subreddit == thread.srs_subreddit and author not in srs_users:
-                        srs_users.append(author)
-                thread.already_processed_users.append(author)
-
         for thread in WatchedTreads.watched_threads_list:
             now = time.time()
             srs_users = []
@@ -127,8 +117,15 @@ class WatchedTreads:
             print(thread.thread_url)
             for comment in praw.helpers.flatten_tree(submission.comments):
                 author = str(comment.author)
-                check_user_comments(limit=150)
-
+                if author and author not in thread.already_processed_users \
+                        and author not in botusername:
+                    user = reddit_session.get_redditor(author)
+                    print(author)
+                    for usercomment in user.get_comments(limit=150):
+                        subreddit = str(usercomment.subreddit)
+                        if subreddit == thread.srs_subreddit and author not in srs_users:
+                            srs_users.append(author)
+                    thread.already_processed_users.append(author)
             print(thread.already_processed_users)
             if srs_users:
                 splitted_comment = thread.bot_reply_body.split(split_mark, 1)
