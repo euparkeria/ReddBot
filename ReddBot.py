@@ -8,17 +8,19 @@ import pickle
 from random import choice
 from twython import Twython
 
-watched_subreddit = 'test123456780'
+watched_subreddit = 'all'
 results_limit = 400
 results_limit_comm = 900
-bot_agent_name = 'antibrigadebot 2.0'
+bot_agent_name = 'antibrigadebot 2.0 /u/antibrigadebot2'
 loop_timer = 60
 secondary_timer = loop_timer * 5
 DEBUG_LEVEL = 1
+CACHEFILE = 'reddbot.cache'
+AUTHFILE = 'ReddAUTH.json'
+DATAFILE = 'ReddDATA.json'
 
 
 class ConnectSocialMedia:
-
     def __init__(self, authinfo, useragent):
 
         self.reddit_session = self.connect_to_reddit(authinfo, useragent=useragent)
@@ -59,9 +61,8 @@ class ReadConfigFiles:
     @staticmethod
     def loadcache():
         try:
-            with open('reddbot.cache', 'rb') as f:
-                entry = pickle.load(f)
-            return entry
+            with open(CACHEFILE, 'rb') as f:
+                return pickle.load(f)
         except:
             print('Cache File not Pressent')
             return False
@@ -98,8 +99,7 @@ class WatchedTreads:
     @staticmethod
     def savecache():
         try:
-            cachefile = 'reddbot.cache'
-            with open(cachefile, 'wb') as fa:
+            with open(CACHEFILE, 'wb') as fa:
                 pickle.dump(WatchedTreads.watched_threads_list, fa)
         except:
             print('ERROR: Cant write cache file')
@@ -108,9 +108,9 @@ class WatchedTreads:
     def update(reddit_session, botusername):
         print(WatchedTreads.watched_threads_list)
         split_mark = '\n\n-----\n'
+        now = time.time()
 
         for thread in WatchedTreads.watched_threads_list:
-            now = time.time()
             srs_users = []
             submission = reddit_session.get_submission(thread.thread_url)
             submission.replace_more_comments(limit=3, threshold=1)
@@ -136,8 +136,9 @@ class WatchedTreads:
                     comment.edit(thread.bot_reply_body)
                 except:
                     print('ERROR: Cant edit brigade comment')
-
-            if now - thread.start_watch_time > 21600:  # if older than 6 hours
+            time_watched = now - thread.start_watch_time
+            print('Watched for {} hours'.format(time_watched/60/60))
+            if time_watched > 21600:  # if older than 6 hours
                 WatchedTreads.watched_threads_list.remove(thread)
                 print('Watched Thread Removed!')
             print(time.time() - now)
@@ -412,7 +413,6 @@ class ReddBot:
                 targeted_submission = self.reddit_session.get_submission(result.args['dsubmission'].url)
                 try:
                     reply = self.commenter(obj=targeted_submission, msg=result.msg_for_reply)
-                    #reply = targeted_submission.comments[0].reply(result.msg_for_reply)
                     add_thread_to_watchlist = WatchedTreads(thread_url=result.args['dsubmission'].url,
                                                             srs_subreddit=str(result.args['dsubmission'].subreddit),
                                                             srs_author=str(result.args['dsubmission'].author),
@@ -432,10 +432,11 @@ class ReddBot:
         if level >= 1:
             print('* {}'.format(debugtext))
 
-    def _log_this(self, logtext):
+    @staticmethod
+    def _log_this(logtext):
         with open('LOG.txt', 'a') as logfile:
             logfile.write('{0}: {1}\n'.format(time.ctime(), logtext))
-        self.debug('LOOGGED {}'.format(logtext))
+        ReddBot.debug('LOOGGED {}'.format(logtext))
 
     def tweet_this(self, msg):
         if len(msg) > 140:
@@ -455,4 +456,4 @@ class ReddBot:
 
 
 start_time = time.time()
-bot1 = ReddBot(useragent=bot_agent_name, authfilename='ReddAUTH.json', datafilename='ReddData.json')
+bot1 = ReddBot(useragent=bot_agent_name, authfilename=AUTHFILE, datafilename=DATAFILE)
