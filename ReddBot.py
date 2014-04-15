@@ -91,6 +91,7 @@ class WatchedTreads:
         self.already_processed_users = []
         self.bot_reply_object_id = bot_reply_object_id
         self.bot_reply_body = bot_reply_body
+        self.keep_alive = 28800
 
         WatchedTreads.watched_threads_list.append(self)
         self.savecache()
@@ -138,7 +139,7 @@ class WatchedTreads:
                     print('ERROR: Cant edit brigade comment')
             time_watched = now - thread.start_watch_time
             print('Watched for {} hours'.format(time_watched/60/60))
-            if time_watched > 21600:  # if older than 6 hours
+            if time_watched > thread.keep_alive:  # if older than 8 hours
                 WatchedTreads.watched_threads_list.remove(thread)
                 print('Watched Thread Removed!')
             print(time.time() - now)
@@ -159,7 +160,7 @@ class MatchedSubmissions:
 
         # list of checks on each submissions, functions MUST return True or False
         self.checks = [self._find_matching_keywords(),
-                       self._detect_brigade()]  #  self._detect_brigade(), self._find_matching_keywords()
+                       self._detect_brigade()]  # self._detect_brigade(), self._find_matching_keywords()
         checks_results = [function for function in self.checks]
         if True in checks_results:
             self.link = self._get_link()  # this is slow so gonna be set only for matching results
@@ -255,7 +256,7 @@ class MatchedSubmissions:
             self.msg_for_reply = "#**NOTICE**:\nThis thread is the target of a possible downvote brigade from " \
                                  "[/r/{0}]({1})^submission ^linked\n\n" \
                 "**Submission Title:**\n\n* *{3}*\n\n**Members of *{0}* involved in this thread:**" \
-                "^list ^updated ^every ^5 ^minutes\n\n \n\n-----\n ^★ *{2}* ^★"\
+                "^list ^updated ^every ^5 ^minutes for 8 hours\n\n \n\n-----\n ^★ *{2}* ^★"\
                 .format(self.args['dsubmission'].subreddit,
                 self.args['dsubmission'].permalink,
                 quote,
