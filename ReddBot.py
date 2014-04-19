@@ -304,18 +304,22 @@ class ReddBot:
             if self.loop_counter >= secondary_timer / loop_timer:
                 self.debug('Maintenance loop')
                 maint_timer = time.time()
+                avg_subs_per_sec = self.permcounters['submissions'] / (time.time() - start_time)
+                self.debug('avg_subs_per_sec {}'.format(avg_subs_per_sec))
                 try:
                     for function in self._maintenance_functions():
                         function()
                 except:
                     self.debug('Maintenance Loop Error')
                 maint_timer = time.time() - maint_timer
-                avg_subs_per_sec = self.permcounters['submissions'] / int(time.time() - start_time)
-                increase_pulllimit_by = maint_timer * int(avg_subs_per_sec)
+                self.debug('maint_seconds {}'.format(maint_timer))
+
+                increase_pulllimit_by = int((maint_timer * avg_subs_per_sec) + 1)
                 self.pulllimit['submissions'] += increase_pulllimit_by
-                self.debug('Pulllimit increased by:'.format(increase_pulllimit_by))
+                self.debug('Pulllimit increased by:{}'.format(increase_pulllimit_by))
 
                 self.loop_counter = 0
+
             self._mainlooper()
 
     def _maintenance_functions(self):
