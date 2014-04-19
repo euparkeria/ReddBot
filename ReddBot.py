@@ -256,7 +256,7 @@ class MatchedSubmissions:
             self.msg_for_reply = "#**NOTICE**:\nThis thread is the target of a possible downvote brigade from " \
                                  "[/r/{0}]({1})^submission ^linked\n\n" \
                 "**Submission Title:**\n\n* *{3}*\n\n**Members of *{0}* involved in this thread:**" \
-                "^list ^updated ^every ^5 ^minutes for 8 hours\n\n \n\n-----\n ^★ *{2}* ^★"\
+                "^list ^updated ^every ^5 ^minutes ^for ^8 ^hours\n\n \n\n-----\n ^★ *{2}* ^★"\
                 .format(self.args['dsubmission'].subreddit,
                 self.args['dsubmission'].permalink,
                 quote,
@@ -303,11 +303,17 @@ class ReddBot:
             self.loop_counter += 1
             if self.loop_counter >= secondary_timer / loop_timer:
                 self.debug('Maintenance loop')
+                maint_timer = time.time()
                 try:
                     for function in self._maintenance_functions():
                         function()
                 except:
                     self.debug('Maintenance Loop Error')
+                maint_timer = time.time() - maint_timer
+                avg_subs_per_sec = self.permcounters['submissions'] / int(time.time() - start_time)
+                increase_pulllimit_by = maint_timer * int(avg_subs_per_sec)
+                self.pulllimit['submissions'] += increase_pulllimit_by
+                self.debug('Pulllimit increased by:'.format(increase_pulllimit_by))
 
                 self.loop_counter = 0
             self._mainlooper()
