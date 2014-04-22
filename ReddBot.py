@@ -121,7 +121,7 @@ class WatchedTreads:
                 if author and author not in thread.already_processed_users \
                         and author not in botusername:
                     user = reddit_session.get_redditor(author)
-                    print('Checking user: {}'.format(author))
+                    print('--Checking user: {}'.format(author))
                     for usercomment in user.get_comments(limit=150):
                         subreddit = str(usercomment.subreddit)
                         if subreddit == thread.srs_subreddit and author not in srs_users:
@@ -137,11 +137,10 @@ class WatchedTreads:
                 except:
                     print('ERROR: Cant edit brigade comment')
             time_watched = now - thread.start_watch_time
-            print('Watched for {} hours'.format(time_watched/60/60))
+            print('--Watched for {} hours'.format(time_watched/60/60))
             if time_watched > thread.keep_alive:  # if older than 8 hours
                 WatchedTreads.watched_threads_list.remove(thread)
-                print('Watched Thread Removed!')
-            print(time.time() - now)
+                print('--Watched Thread Removed!')
         WatchedTreads.savecache()
 
 
