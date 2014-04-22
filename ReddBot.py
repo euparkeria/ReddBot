@@ -107,7 +107,7 @@ class WatchedTreads:
 
     @staticmethod
     def update(reddit_session, botusername):
-        print(WatchedTreads.watched_threads_list)
+        print('Currently Watching {} threads.'.format(len(WatchedTreads.watched_threads_list)))
         split_mark = '\n\n-----\n'
         now = time.time()
 
@@ -115,19 +115,18 @@ class WatchedTreads:
             srs_users = []
             submission = reddit_session.get_submission(thread.thread_url)
             submission.replace_more_comments(limit=3, threshold=1)
-            print(thread.thread_url)
+            print('Now processing: {}'.format(thread.thread_url))
             for comment in praw.helpers.flatten_tree(submission.comments):
                 author = str(comment.author)
                 if author and author not in thread.already_processed_users \
                         and author not in botusername:
                     user = reddit_session.get_redditor(author)
-                    print(author)
+                    print('Checking user: {}'.format(author))
                     for usercomment in user.get_comments(limit=150):
                         subreddit = str(usercomment.subreddit)
                         if subreddit == thread.srs_subreddit and author not in srs_users:
                             srs_users.append(author)
                     thread.already_processed_users.append(author)
-            print(thread.already_processed_users)
             if srs_users:
                 splitted_comment = thread.bot_reply_body.split(split_mark, 1)
                 srs_users_lines = ''.join(['\n\n* ' + user for user in srs_users])
@@ -290,37 +289,38 @@ class ReddBot:
         self.processed_objects = {'comments': [], 'submissions': []}
         self.loops = ['submissions']  # 'submissions' and 'comments' loops
         self.permcounters = {'comments': 0, 'submissions': 0}
-        self.loop_counter = 0
         self.redd_data = {}
         self.bot_auth_info = {}
         self.reddit_session = None
         self.twitter = None
         self.config = ReadConfigFiles()
-
         self.placeholder_id = None  # this doesn't always work !? but it will lower the traffic to some extent
 
+        loop_counter = 0
         while True:
-            self.loop_counter += 1
-            if self.loop_counter >= secondary_timer / loop_timer:
-                self.debug('Maintenance loop')
-                maint_timer = time.time()
-                avg_subs_per_sec = self.permcounters['submissions'] / (time.time() - start_time)
-                self.debug('avg_subs_per_sec {}'.format(avg_subs_per_sec))
-                try:
-                    for function in self._maintenance_functions():
-                        function()
-                except:
-                    self.debug('Maintenance Loop Error')
-                maint_timer = time.time() - maint_timer
-                self.debug('maint_seconds {}'.format(maint_timer))
-
-                increase_pulllimit_by = int((maint_timer * avg_subs_per_sec) + 1)
-                self.pulllimit['submissions'] += increase_pulllimit_by
-                self.debug('Pulllimit increased by:{}'.format(increase_pulllimit_by))
-
-                self.loop_counter = 0
+            loop_counter += 1
+            if loop_counter >= secondary_timer / loop_timer:
+                self._maintenance_loop()
+                loop_counter = 0
 
             self._mainlooper()
+
+    def _maintenance_loop(self):
+        self.debug('Maintenance loop')
+        maint_timer = time.time()
+        avg_subs_per_sec = self.permcounters['submissions'] / (time.time() - start_time)
+        self.debug('avg_subs_per_sec {}'.format(avg_subs_per_sec))
+        try:
+            for function in self._maintenance_functions():
+                function()
+        except:
+            self.debug('Maintenance Loop Error')
+        maint_timer = time.time() - maint_timer
+        self.debug('maint_seconds {}'.format(maint_timer))
+
+        increase_pulllimit_by = int((maint_timer * avg_subs_per_sec) + 1)
+        self.pulllimit['submissions'] += increase_pulllimit_by
+        self.debug('Pulllimit increased by:{}'.format(increase_pulllimit_by))
 
     def _maintenance_functions(self):
         def watchthreads():
