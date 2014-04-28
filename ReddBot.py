@@ -91,7 +91,7 @@ class WatchedTreads:
         self.already_processed_users = []
         self.bot_reply_object_id = bot_reply_object_id
         self.bot_reply_body = bot_reply_body
-        self.keep_alive = 28800
+        self.keep_alive = 28800  # time to watch thread in seconds
 
         WatchedTreads.watched_threads_list.append(self)
         self.savecache()
@@ -121,11 +121,12 @@ class WatchedTreads:
                 if author and author not in thread.already_processed_users \
                         and author not in botusername:
                     user = reddit_session.get_redditor(author)
-                    print('--Checking user: {}'.format(author))
+                    print('--Checking user: {}'.format(author), end=" ")
                     for usercomment in user.get_comments(limit=150):
                         subreddit = str(usercomment.subreddit)
                         if subreddit == thread.srs_subreddit and author not in srs_users:
                             srs_users.append(author)
+                            print('MATCH')
                     thread.already_processed_users.append(author)
             if srs_users:
                 splitted_comment = thread.bot_reply_body.split(split_mark, 1)
@@ -135,7 +136,7 @@ class WatchedTreads:
                     comment = reddit_session.get_info(thing_id=thread.bot_reply_object_id)
                     comment.edit(thread.bot_reply_body)
                 except:
-                    print('ERROR: Cant edit brigade comment')
+                    ReddBot.debug('ERROR: Cant edit brigade comment')
             time_watched = now - thread.start_watch_time
             print('--Watched for {} hours'.format(time_watched/60/60))
             if time_watched > thread.keep_alive:  # if older than 8 hours
@@ -431,7 +432,7 @@ class ReddBot:
 
                     self.debug('AntiBrigadeBot NOTICE sent')
                 except:
-                    self._log_this('Bot is BANNED in:{}, cant reply ):'.format(targeted_submission.subreddit))
+                    self.log_this('Bot is BANNED in:{}, cant reply ):'.format(targeted_submission.subreddit))
 
             if result.msg_for_tweet:
                 self.tweet_this(result.msg_for_tweet)
@@ -443,7 +444,7 @@ class ReddBot:
             print('* {}'.format(debugtext))
 
     @staticmethod
-    def _log_this(logtext):
+    def log_this(logtext):
         with open('LOG.txt', 'a') as logfile:
             logfile.write('{0}: {1}\n'.format(time.ctime(), logtext))
         ReddBot.debug('LOOGGED {}'.format(logtext))
