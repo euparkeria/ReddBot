@@ -134,7 +134,7 @@ class WatchedTreads:
                         if subreddit == thread.srs_subreddit:
                             user_srs_karma_balance += (usercomment.ups - usercomment.downs)
 
-                    print(', {0} karma balance:{1}'.format(subreddit, user_srs_karma_balance), end=" ")
+                    print(', {0} karma balance:{1}'.format(thread.srs_subreddit, user_srs_karma_balance), end=" ")
 
                     if user_srs_karma_balance >= karma_upper_limit:
                         srs_users.append(author)
