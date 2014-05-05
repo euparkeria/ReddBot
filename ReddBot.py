@@ -111,7 +111,7 @@ class WatchedTreads:
         split_mark = '\n\n-----\n'
         now = time.time()
         user_comments_limit = 200
-        karma_upper_limit = 5
+        karma_upper_limit = 5  # if poster has more than that amount of karma in the srs subreddit he is added
 
         for thread in WatchedTreads.watched_threads_list:
             srs_users = []
@@ -134,7 +134,7 @@ class WatchedTreads:
                         if subreddit == thread.srs_subreddit:
                             user_srs_karma_balance += (usercomment.ups - usercomment.downs)
 
-                    print(', {0} karma balance:{1}'.format(thread.srs_subreddit, user_srs_karma_balance), end=" ")
+                    print(', /r/{0} karma balance:{1} '.format(thread.srs_subreddit, user_srs_karma_balance), end=" ")
 
                     if user_srs_karma_balance >= karma_upper_limit:
                         srs_users.append(author)
