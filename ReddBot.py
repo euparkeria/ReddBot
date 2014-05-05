@@ -110,23 +110,36 @@ class WatchedTreads:
         print('Currently Watching {} threads.'.format(len(WatchedTreads.watched_threads_list)))
         split_mark = '\n\n-----\n'
         now = time.time()
+        user_comments_limit = 200
+        karma_upper_limit = 5
 
         for thread in WatchedTreads.watched_threads_list:
             srs_users = []
             submission = reddit_session.get_submission(thread.thread_url)
             submission.replace_more_comments(limit=3, threshold=1)
             print('Now processing: {}'.format(thread.thread_url))
+
             for comment in praw.helpers.flatten_tree(submission.comments):
                 author = str(comment.author)
-                if author and author not in thread.already_processed_users \
-                        and author not in botusername:
+
+                if author and author not in thread.already_processed_users and author not in botusername:
+
                     user = reddit_session.get_redditor(author)
+                    user_srs_karma_balance = 0
                     print('--Checking user: {}'.format(author), end=" ")
-                    for usercomment in user.get_comments(limit=150):
+
+                    for usercomment in user.get_comments(limit=user_comments_limit):
+
                         subreddit = str(usercomment.subreddit)
-                        if subreddit == thread.srs_subreddit and author not in srs_users:
-                            srs_users.append(author)
-                            print('MATCH')
+                        if subreddit == thread.srs_subreddit:
+                            user_srs_karma_balance += (usercomment.ups - usercomment.downs)
+
+                    print(', {0} karma balance:{1}'.format(subreddit, user_srs_karma_balance), end=" ")
+
+                    if user_srs_karma_balance >= karma_upper_limit:
+                        srs_users.append(author)
+                        print('MATCH', end=" ")
+                    print('\n')
                     thread.already_processed_users.append(author)
             if srs_users:
                 splitted_comment = thread.bot_reply_body.split(split_mark, 1)
