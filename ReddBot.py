@@ -217,6 +217,7 @@ class MatchedSubmissions:
 
     @staticmethod
     def _find_good_quote(quotes, topicname):
+
         quotes_matched = {}
 
         def remove_punctuation(quote):
@@ -225,8 +226,8 @@ class MatchedSubmissions:
             for letter in quote:
                 if letter not in punctuation:
                     punct_clear += letter
-            #return punct_clear.split()
-            return punct_clear
+            return punct_clear.split()
+            #return punct_clear
 
         def longest_common_substring(s1, s2):
             m = [[0] * (len(s2) + 1) for i in range(len(s1) + 1)]
@@ -243,18 +244,20 @@ class MatchedSubmissions:
             return s1[x_longest - longest: x_longest]
 
         topicname = remove_punctuation(topicname.lower())
+
         for i in range(len(quotes)):
             q = remove_punctuation(quotes[i].lower())
-
-            #match = ' '.join(longest_common_substring(topicname, q))
             match = longest_common_substring(topicname, q)
-            if len(match):
-                quotes_matched[match + "{:.>4}".format(i)] = quotes[i]
+
+            if match:
+                if len(max(match, key=len)) >= 4:
+                    match = ' '.join(match)
+                    quotes_matched[match + "{:.>4}".format(i)] = quotes[i]
 
         if quotes_matched:
             keys = list(quotes_matched.keys())
             longst_key_lenght = len(max(keys, key=len))
-            longest_keys = [key for key in keys if len(key) == longst_key_lenght]
+            longest_keys = [key for key in keys if len(key) >= longst_key_lenght - 2]  # all longest and longest - 2
             print(longest_keys)
             quote_to_return = quotes_matched[choice(longest_keys)]
 
