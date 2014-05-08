@@ -105,12 +105,26 @@ class WatchedTreads:
         except:
             print('ERROR: Cant write cache file')
 
+
+    @staticmethod
+    def get_user_karma_balance(author, in_subreddit, reddit_session):
+        user_comments_limit = 200
+        user_srs_karma_balance = 0
+        user = reddit_session.get_redditor(author)
+        try:
+            for usercomment in user.get_comments(limit=user_comments_limit):
+                if str(usercomment.subreddit) == in_subreddit:
+                    user_srs_karma_balance += (usercomment.ups - usercomment.downs)
+        except:
+            ReddBot.debug('ERROR: Cant get user SRS karma balance!!')
+        return user_srs_karma_balance
+
     @staticmethod
     def update(reddit_session, botusername):
         print('Currently Watching {} threads.'.format(len(WatchedTreads.watched_threads_list)))
         split_mark = '\n\n-----\n'
         now = time.time()
-        user_comments_limit = 200
+
         karma_upper_limit = 5  # if poster has more than that amount of karma in the srs subreddit he is added
 
         for thread in WatchedTreads.watched_threads_list:
@@ -118,29 +132,23 @@ class WatchedTreads:
             submission = reddit_session.get_submission(thread.thread_url)
             submission.replace_more_comments(limit=3, threshold=1)
             print('Now processing: {}'.format(thread.thread_url))
+            try:
+                for comment in praw.helpers.flatten_tree(submission.comments):
+                    author = str(comment.author)
+                    if author and author not in thread.already_processed_users and author not in botusername:
+                        print('--Checking user: {}'.format(author), end=" ")
+                        user_srs_karma_balance = WatchedTreads.get_user_karma_balance(author=author,
+                                                                                      in_subreddit=thread.srs_subreddit,
+                                                                                      reddit_session=reddit_session)
+                        print(',/r/{0} karma score:{1} '.format(thread.srs_subreddit, user_srs_karma_balance), end=" ")
 
-            for comment in praw.helpers.flatten_tree(submission.comments):
-                author = str(comment.author)
-
-                if author and author not in thread.already_processed_users and author not in botusername:
-
-                    user = reddit_session.get_redditor(author)
-                    user_srs_karma_balance = 0
-                    print('--Checking user: {}'.format(author), end=" ")
-
-                    for usercomment in user.get_comments(limit=user_comments_limit):
-
-                        subreddit = str(usercomment.subreddit)
-                        if subreddit == thread.srs_subreddit:
-                            user_srs_karma_balance += (usercomment.ups - usercomment.downs)
-
-                    print(', /r/{0} karma balance:{1} '.format(thread.srs_subreddit, user_srs_karma_balance), end=" ")
-
-                    if user_srs_karma_balance >= karma_upper_limit:
-                        srs_users.append(author)
-                        print('MATCH', end=" ")
-                    print('\n')
-                    thread.already_processed_users.append(author)
+                        if user_srs_karma_balance >= karma_upper_limit:
+                            srs_users.append(author)
+                            print('MATCH', end=" ")
+                        print('.')
+                        thread.already_processed_users.append(author)
+            except:
+                ReddBot.debug('ERROR:couldnt scan all watched threads comments')
             if srs_users:
                 splitted_comment = thread.bot_reply_body.split(split_mark, 1)
                 srs_users_lines = ''.join(['\n\n* ' + user for user in srs_users])
@@ -217,7 +225,6 @@ class MatchedSubmissions:
 
     @staticmethod
     def _find_good_quote(quotes, topicname):
-
         quotes_matched = {}
 
         def remove_punctuation(quote):
@@ -226,8 +233,8 @@ class MatchedSubmissions:
             for letter in quote:
                 if letter not in punctuation:
                     punct_clear += letter
-            return punct_clear.split()
-            #return punct_clear
+            #return punct_clear.split()
+            return punct_clear
 
         def longest_common_substring(s1, s2):
             m = [[0] * (len(s2) + 1) for i in range(len(s1) + 1)]
@@ -250,6 +257,8 @@ class MatchedSubmissions:
             match = longest_common_substring(topicname, q)
 
             if match:
+                match = match.split()
+
                 if len(max(match, key=len)) >= 4:
                     match = ' '.join(match)
                     quotes_matched[match + "{:.>4}".format(i)] = quotes[i]
@@ -326,11 +335,11 @@ class ReddBot:
         maint_timer = time.time()
         avg_subs_per_sec = self.permcounters['submissions'] / (time.time() - start_time)
         self.debug('avg_subs_per_sec {}'.format(avg_subs_per_sec))
-        try:
-            for function in self._maintenance_functions():
-                function()
-        except:
-            self.debug('Maintenance Loop Error')
+        #try:
+        for function in self._maintenance_functions():
+            function()
+        #except:
+            #self.debug('Maintenance Loop Error')
         maint_timer = time.time() - maint_timer
         self.debug('maint_seconds {}'.format(maint_timer))
 
