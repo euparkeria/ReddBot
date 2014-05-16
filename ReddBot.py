@@ -20,22 +20,25 @@ AUTHFILE = 'ReddAUTH.json'
 DATAFILE = 'ReddDATA.json'
 
 
-class ConnectSocialMedia:
+class SocialMedia:
+    def __init__(self):
+        self.reddit_object = self.connect_to_reddit()
+        self.twitter_object = self.connect_to_twitter()
 
     @staticmethod
-    def connect_to_reddit(authinfo, useragent):
-        #try:
-        r = praw.Reddit(user_agent=useragent, api_request_delay=1)
-        r.login(authinfo['REDDIT_BOT_USERNAME'], authinfo['REDDIT_BOT_PASSWORD'])
-        #except:
-            #print('ERROR: Cant login to Reddit.com')
+    def connect_to_reddit():
+        try:
+            r = praw.Reddit(user_agent=bot_agent_name, api_request_delay=1)
+            r.login(botconfig.bot_auth_info['REDDIT_BOT_USERNAME'], botconfig.bot_auth_info['REDDIT_BOT_PASSWORD'])
+        except:
+            print('ERROR: Cant login to Reddit.com')
         return r
 
     @staticmethod
-    def connect_to_twitter(authinfo):
+    def connect_to_twitter():
         try:
-            t = Twython(authinfo['APP_KEY'], authinfo['APP_SECRET'],
-                        authinfo['OAUTH_TOKEN'], authinfo['OAUTH_TOKEN_SECRET'])
+            t = Twython(botconfig.bot_auth_info['APP_KEY'], botconfig.bot_auth_info['APP_SECRET'],
+                        botconfig.bot_auth_info['OAUTH_TOKEN'], botconfig.bot_auth_info['OAUTH_TOKEN_SECRET'])
         except:
             print('ERROR: Cant authenticate into twitter')
         return t
@@ -313,9 +316,8 @@ class MatchedSubmissions:
 
 class ReddBot:
 
-    def __init__(self, useragent, datafilename):
+    def __init__(self):
         self.first_run = True
-        self.args = {'useragent': useragent, 'datafilename': datafilename}
         self.pulllimit = {'submissions': results_limit, 'comments': results_limit_comm}
         self.cont_num = {'comments': 0, 'submissions': 0}
         self.processed_objects = {'comments': [], 'submissions': []}
@@ -487,7 +489,8 @@ class ReddBot:
 
 start_time = time.time()
 botconfig = ConfigFiles()
+socmedia = SocialMedia()
 
-reddit_session = ConnectSocialMedia.connect_to_reddit(authinfo=botconfig.bot_auth_info, useragent=bot_agent_name)
-twitter_session = ConnectSocialMedia.connect_to_twitter(authinfo=botconfig.bot_auth_info)
-bot1 = ReddBot(useragent=bot_agent_name, datafilename=DATAFILE)
+reddit_session = socmedia.reddit_object
+twitter_session = socmedia.twitter_object
+bot1 = ReddBot()
