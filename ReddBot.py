@@ -362,7 +362,7 @@ class ReddBot:
         def reloadconfig():
             botconfig.check_for_updated_config()
 
-        return [watchthreads, reloadconfig()]
+        return [watchthreads, reloadconfig]
 
     def _mainlooper(self):
 
