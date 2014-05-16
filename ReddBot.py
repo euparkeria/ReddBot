@@ -21,18 +21,14 @@ DATAFILE = 'ReddDATA.json'
 
 
 class ConnectSocialMedia:
-    def __init__(self, authinfo, useragent):
-
-        self.reddit_session = self.connect_to_reddit(authinfo, useragent=useragent)
-        self.twitter_session = self.connect_to_twitter(authinfo)
 
     @staticmethod
     def connect_to_reddit(authinfo, useragent):
-        try:
-            r = praw.Reddit(user_agent=useragent, api_request_delay=1)
-            r.login(authinfo['REDDIT_BOT_USERNAME'], authinfo['REDDIT_BOT_PASSWORD'])
-        except:
-            print('ERROR: Cant login to Reddit.com')
+        #try:
+        r = praw.Reddit(user_agent=useragent, api_request_delay=1)
+        r.login(authinfo['REDDIT_BOT_USERNAME'], authinfo['REDDIT_BOT_PASSWORD'])
+        #except:
+            #print('ERROR: Cant login to Reddit.com')
         return r
 
     @staticmethod
@@ -45,12 +41,23 @@ class ConnectSocialMedia:
         return t
 
 
-class ReadConfigFiles:
+class ConfigFiles:
     def __init__(self):
         self.data_modified_time = 0
         cache = self.loadcache()
         if cache:
             WatchedTreads.watched_threads_list = cache
+
+        self.redd_data = self.readdatafile(datafilename=DATAFILE)
+        self.bot_auth_info = self.readauthfile(authfilename=AUTHFILE)
+
+    def check_for_updated_conifig(self):
+        if os.stat(DATAFILE).st_mtime > self.data_modified_time:
+            self.redd_data = botconfig.readdatafile(datafilename=DATAFILE)
+            self.bot_auth_info = botconfig.readauthfile(authfilename=AUTHFILE)
+            ReddBot.debug('CONFIG FILES CHANGED, RELOADING!')
+            return True
+
 
     @staticmethod
     def readauthfile(authfilename):
@@ -105,9 +112,8 @@ class WatchedTreads:
         except:
             print('ERROR: Cant write cache file')
 
-
     @staticmethod
-    def get_user_karma_balance(author, in_subreddit, reddit_session):
+    def get_user_karma_balance(author, in_subreddit):
         user_comments_limit = 200
         user_srs_karma_balance = 0
         user = reddit_session.get_redditor(author)
@@ -120,7 +126,7 @@ class WatchedTreads:
         return user_srs_karma_balance
 
     @staticmethod
-    def update(reddit_session, botusername):
+    def update(botusername):
         print('Currently Watching {} threads.'.format(len(WatchedTreads.watched_threads_list)))
         split_mark = '\n\n-----\n'
         now = time.time()
@@ -138,8 +144,7 @@ class WatchedTreads:
                     if author and author not in thread.already_processed_users and author not in botusername:
                         print('--Checking user: {}'.format(author), end=" ")
                         user_srs_karma_balance = WatchedTreads.get_user_karma_balance(author=author,
-                                                                                      in_subreddit=thread.srs_subreddit,
-                                                                                      reddit_session=reddit_session)
+                                                                                      in_subreddit=thread.srs_subreddit)
                         print(',/r/{0} karma score:{1} '.format(thread.srs_subreddit, user_srs_karma_balance), end=" ")
 
                         if user_srs_karma_balance >= karma_upper_limit:
@@ -308,19 +313,15 @@ class MatchedSubmissions:
 
 class ReddBot:
 
-    def __init__(self, useragent, authfilename, datafilename):
+    def __init__(self, useragent, datafilename):
         self.first_run = True
-        self.args = {'useragent': useragent, 'authfilename': authfilename, 'datafilename': datafilename}
+        self.args = {'useragent': useragent, 'datafilename': datafilename}
         self.pulllimit = {'submissions': results_limit, 'comments': results_limit_comm}
         self.cont_num = {'comments': 0, 'submissions': 0}
         self.processed_objects = {'comments': [], 'submissions': []}
         self.loops = ['submissions']  # 'submissions' and 'comments' loops
         self.permcounters = {'comments': 0, 'submissions': 0}
-        self.redd_data = {}
-        self.bot_auth_info = {}
-        self.reddit_session = None
         self.twitter = None
-        self.config = ReadConfigFiles()
         self.placeholder_id = None  # this doesn't always work !? but it will lower the traffic to some extent
 
         loop_counter = 0
@@ -351,21 +352,12 @@ class ReddBot:
 
     def _maintenance_functions(self):
         def watchthreads():
-            WatchedTreads.update(reddit_session=self.reddit_session,
-                                 botusername=self.bot_auth_info['REDDIT_BOT_USERNAME'])
+            WatchedTreads.update(botusername=botconfig.bot_auth_info['REDDIT_BOT_USERNAME'])
 
         return [watchthreads]
 
     def _mainlooper(self):
-
-        if os.stat(self.args['datafilename']).st_mtime > self.config.data_modified_time:
-            self.redd_data = self.config.readdatafile(self.args['datafilename'])
-            self.bot_auth_info = self.config.readauthfile(self.args['authfilename'])
-            self.debug('CONFIG FILES REREAD!')
-            bot_session = ConnectSocialMedia(self.bot_auth_info, useragent=self.args['useragent'])
-            self.reddit_session = bot_session.reddit_session
-            self.twitter = bot_session.twitter_session
-            self.debug('RECONNECTED!')
+        botconfig.check_for_updated_conifig()
 
         self.cont_num['submissions'], self.cont_num['comments'] = 0, 0
 
@@ -407,10 +399,10 @@ class ReddBot:
 
     def _get_new_comments_or_subs(self, target):
         if target == 'submissions':
-            results = self.reddit_session.get_subreddit(watched_subreddit).get_new(limit=self.pulllimit[target],
+            results = reddit_session.get_subreddit(watched_subreddit).get_new(limit=self.pulllimit[target],
                                                                                    place_holder=self.placeholder_id)
         if target == 'comments':
-            results = self.reddit_session.get_comments(watched_subreddit, limit=self.pulllimit[target])
+            results = reddit_session.get_comments(watched_subreddit, limit=self.pulllimit[target])
         new_submissions_list = []
         try:
             for submission in results:
@@ -432,7 +424,7 @@ class ReddBot:
             for new_submission in new_submissions:
                 result_object = MatchedSubmissions(target=target,
                                                    dsubmission=new_submission,
-                                                   keyword_lists=self.redd_data)
+                                                   keyword_lists=botconfig.redd_data)
 
             if result_object.matching_results:
                 self.dispatch_nitifications(results_list=result_object.matching_results)
@@ -448,7 +440,7 @@ class ReddBot:
     def dispatch_nitifications(self, results_list):
         for result in results_list:
             if result.msg_for_reply:
-                targeted_submission = self.reddit_session.get_submission(result.args['dsubmission'].url)
+                targeted_submission = reddit_session.get_submission(result.args['dsubmission'].url)
                 try:
                     reply = self.commenter(obj=targeted_submission, msg=result.msg_for_reply)
                     add_thread_to_watchlist = WatchedTreads(thread_url=result.args['dsubmission'].url,
@@ -481,17 +473,21 @@ class ReddBot:
             msg = msg[:139]
             self.debug('MSG exceeding 140 characters!!')
         try:
-            self.twitter.update_status(status=msg)
+            twitter_session.update_status(status=msg)
             self.debug('TWEET SENT!!!')
         except:
             print('ERROR: couldnt update twitter status')
 
     def send_pm_to_owner(self, pm_text):
         try:
-            self.reddit_session.send_message(self.bot_auth_info['REDDIT_PM_TO'], pm_text)
+            self.reddit_session.send_message(botconfig.bot_auth_info['REDDIT_PM_TO'], pm_text)
         except:
             print('ERROR:Cant send pm')
 
 
 start_time = time.time()
-bot1 = ReddBot(useragent=bot_agent_name, authfilename=AUTHFILE, datafilename=DATAFILE)
+botconfig = ConfigFiles()
+
+reddit_session = ConnectSocialMedia.connect_to_reddit(authinfo=botconfig.bot_auth_info, useragent=bot_agent_name)
+twitter_session = ConnectSocialMedia.connect_to_twitter(authinfo=botconfig.bot_auth_info)
+bot1 = ReddBot(useragent=bot_agent_name, datafilename=DATAFILE)
