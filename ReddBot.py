@@ -277,12 +277,14 @@ class MatchedSubmissions:
     def _brigade_message(self):
         if self.is_srs:
             quote = self._find_good_quote(self.args['keyword_lists']['quotes'], self.args['dsubmission'].title)
+            submissionlink = self.args['dsubmission'].permalink.replace('http://www.reddit.com', 'http://np.reddit.com')
+
             self.msg_for_reply = "#**NOTICE**:\nThis thread is the target of a possible downvote brigade from " \
                                  "[/r/{0}]({1})^submission ^linked\n\n" \
                 "**Submission Title:**\n\n* *{3}*\n\n**Members of *{0}* involved in this thread:**" \
                 "^list ^updated ^every ^5 ^minutes ^for ^8 ^hours\n\n \n\n-----\n ^★ *{2}* ^★"\
                 .format(self.args['dsubmission'].subreddit,
-                self.args['dsubmission'].permalink,
+                submissionlink,
                 quote,
                 self.args['dsubmission'].title)
             return True
