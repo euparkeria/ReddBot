@@ -51,20 +51,22 @@ class ConfigFiles:
         if cache:
             WatchedTreads.watched_threads_list = cache
 
-        self.redd_data = self.readdatafile(datafilename=DATAFILE)
-        self.bot_auth_info = self.readauthfile(authfilename=AUTHFILE)
+        self.redd_data = None
+        self.bot_auth_info = None
+
+        self.check_for_updated_conifig()
 
     def check_for_updated_conifig(self):
         if os.stat(DATAFILE).st_mtime > self.data_modified_time:
-            self.redd_data = botconfig.readdatafile(datafilename=DATAFILE)
-            self.bot_auth_info = botconfig.readauthfile(authfilename=AUTHFILE)
-            ReddBot.debug('CONFIG FILES CHANGED, RELOADING!')
+            self.redd_data = self.readdatafile()
+            self.bot_auth_info = self.readauthfile()
+            ReddBot.debug('CONFIG FILES RELOADED!')
             return True
 
 
     @staticmethod
-    def readauthfile(authfilename):
-        with open(authfilename, 'r', encoding='utf-8') as f:
+    def readauthfile():
+        with open(AUTHFILE, 'r', encoding='utf-8') as f:
             bot_auth_info = json.load(f)
         return bot_auth_info
 
@@ -77,10 +79,10 @@ class ConfigFiles:
             print('Cache File not Pressent')
             return False
 
-    def readdatafile(self, datafilename):
+    def readdatafile(self):
         try:
-            self.data_modified_time = os.stat(datafilename).st_mtime
-            with open(datafilename, 'r', encoding='utf-8') as f:
+            self.data_modified_time = os.stat(DATAFILE).st_mtime
+            with open(DATAFILE, 'r', encoding='utf-8') as f:
                 redd_data = json.load(f)
                 redd_data['KEYWORDS'] = sorted(redd_data['KEYWORDS'], key=len, reverse=True)
                 redd_data['SRSs'] = [x.lower() for x in redd_data['SRSs']]
