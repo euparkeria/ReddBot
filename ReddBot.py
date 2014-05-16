@@ -54,9 +54,9 @@ class ConfigFiles:
         self.redd_data = None
         self.bot_auth_info = None
 
-        self.check_for_updated_conifig()
+        self.check_for_updated_config()
 
-    def check_for_updated_conifig(self):
+    def check_for_updated_config(self):
         if os.stat(DATAFILE).st_mtime > self.data_modified_time:
             self.redd_data = self.readdatafile()
             self.bot_auth_info = self.readauthfile()
@@ -360,7 +360,7 @@ class ReddBot:
             WatchedTreads.update(botusername=botconfig.bot_auth_info['REDDIT_BOT_USERNAME'])
 
         def reloadconfig():
-            botconfig.check_for_updated_conifig()
+            botconfig.check_for_updated_config()
 
         return [watchthreads, reloadconfig()]
 
