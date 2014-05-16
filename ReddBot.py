@@ -22,8 +22,8 @@ DATAFILE = 'ReddDATA.json'
 
 class SocialMedia:
     def __init__(self):
-        self.reddit_object = self.connect_to_reddit()
-        self.twitter_object = self.connect_to_twitter()
+        self.reddit_session = self.connect_to_reddit()
+        self.twitter_session = self.connect_to_twitter()
 
     @staticmethod
     def connect_to_reddit():
@@ -119,7 +119,7 @@ class WatchedTreads:
     def get_user_karma_balance(author, in_subreddit):
         user_comments_limit = 200
         user_srs_karma_balance = 0
-        user = reddit_session.get_redditor(author)
+        user = socmedia.reddit_session.get_redditor(author)
         try:
             for usercomment in user.get_comments(limit=user_comments_limit):
                 if str(usercomment.subreddit) == in_subreddit:
@@ -138,7 +138,7 @@ class WatchedTreads:
 
         for thread in WatchedTreads.watched_threads_list:
             srs_users = []
-            submission = reddit_session.get_submission(thread.thread_url)
+            submission = socmedia.reddit_session.get_submission(thread.thread_url)
             submission.replace_more_comments(limit=3, threshold=1)
             print('Now processing: {}'.format(thread.thread_url))
             try:
@@ -162,7 +162,7 @@ class WatchedTreads:
                 srs_users_lines = ''.join(['\n\n* ' + user for user in srs_users])
                 thread.bot_reply_body = splitted_comment[0] + srs_users_lines + split_mark + splitted_comment[1]
                 try:
-                    comment = reddit_session.get_info(thing_id=thread.bot_reply_object_id)
+                    comment = socmedia.reddit_session.get_info(thing_id=thread.bot_reply_object_id)
                     comment.edit(thread.bot_reply_body)
                 except:
                     ReddBot.debug('ERROR: Cant edit brigade comment')
@@ -352,14 +352,17 @@ class ReddBot:
         self.pulllimit['submissions'] += increase_pulllimit_by
         self.debug('Pulllimit increased by:{}'.format(increase_pulllimit_by))
 
-    def _maintenance_functions(self):
+    @staticmethod
+    def _maintenance_functions():
         def watchthreads():
             WatchedTreads.update(botusername=botconfig.bot_auth_info['REDDIT_BOT_USERNAME'])
 
-        return [watchthreads]
+        def reloadconfig():
+            botconfig.check_for_updated_conifig()
+
+        return [watchthreads, reloadconfig()]
 
     def _mainlooper(self):
-        botconfig.check_for_updated_conifig()
 
         self.cont_num['submissions'], self.cont_num['comments'] = 0, 0
 
@@ -401,10 +404,10 @@ class ReddBot:
 
     def _get_new_comments_or_subs(self, target):
         if target == 'submissions':
-            results = reddit_session.get_subreddit(watched_subreddit).get_new(limit=self.pulllimit[target],
-                                                                                   place_holder=self.placeholder_id)
+            results = socmedia.reddit_session.get_subreddit(watched_subreddit).get_new(limit=self.pulllimit[target],
+                                                                                       place_holder=self.placeholder_id)
         if target == 'comments':
-            results = reddit_session.get_comments(watched_subreddit, limit=self.pulllimit[target])
+            results = socmedia.reddit_session.get_comments(watched_subreddit, limit=self.pulllimit[target])
         new_submissions_list = []
         try:
             for submission in results:
@@ -442,7 +445,7 @@ class ReddBot:
     def dispatch_nitifications(self, results_list):
         for result in results_list:
             if result.msg_for_reply:
-                targeted_submission = reddit_session.get_submission(result.args['dsubmission'].url)
+                targeted_submission = socmedia.reddit_session.get_submission(result.args['dsubmission'].url)
                 try:
                     reply = self.commenter(obj=targeted_submission, msg=result.msg_for_reply)
                     add_thread_to_watchlist = WatchedTreads(thread_url=result.args['dsubmission'].url,
@@ -475,14 +478,14 @@ class ReddBot:
             msg = msg[:139]
             self.debug('MSG exceeding 140 characters!!')
         try:
-            twitter_session.update_status(status=msg)
+            socmedia.twitter_session.update_status(status=msg)
             self.debug('TWEET SENT!!!')
         except:
             print('ERROR: couldnt update twitter status')
 
     def send_pm_to_owner(self, pm_text):
         try:
-            self.reddit_session.send_message(botconfig.bot_auth_info['REDDIT_PM_TO'], pm_text)
+            socmedia.reddit_session.send_message(botconfig.bot_auth_info['REDDIT_PM_TO'], pm_text)
         except:
             print('ERROR:Cant send pm')
 
@@ -491,6 +494,4 @@ start_time = time.time()
 botconfig = ConfigFiles()
 socmedia = SocialMedia()
 
-reddit_session = socmedia.reddit_object
-twitter_session = socmedia.twitter_object
 bot1 = ReddBot()
