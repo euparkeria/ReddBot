@@ -131,43 +131,57 @@ class WatchedTreads:
         return user_srs_karma_balance
 
     @staticmethod
-    def update(botusername):
+    def get_authors_in_thread(thread):
+        authors_list = []
+        submission = socmedia.reddit_session.get_submission(thread)
+        submission.replace_more_comments(limit=4, threshold=1)
+        try:
+            for comment in praw.helpers.flatten_tree(submission.comments):
+                author = str(comment.author)
+                if author not in botconfig.bot_auth_info['REDDIT_BOT_USERNAME']:
+                    authors_list.append(author)
+        except:
+            ReddBot.debug('ERROR:couldnt get all authors from thread')
+        return authors_list
+
+    @staticmethod
+    def edit_comment(comment_id, comment_body):
+        try:
+            comment = socmedia.reddit_session.get_info(thing_id=comment_id)
+            comment.edit(comment_body)
+            print('Comment : {} edited.'.format(comment_id))
+        except:
+            ReddBot.debug('ERROR: Cant edit comment')
+
+    @staticmethod
+    def update():
         print('Currently Watching {} threads.'.format(len(WatchedTreads.watched_threads_list)))
         split_mark = '\n\n-----\n'
         now = time.time()
-
         karma_upper_limit = 5  # if poster has more than that amount of karma in the srs subreddit he is added
 
         for thread in WatchedTreads.watched_threads_list:
             srs_users = []
-            submission = socmedia.reddit_session.get_submission(thread.thread_url)
-            submission.replace_more_comments(limit=3, threshold=1)
             print('Now processing: {}'.format(thread.thread_url))
-            try:
-                for comment in praw.helpers.flatten_tree(submission.comments):
-                    author = str(comment.author)
-                    if author and author not in thread.already_processed_users and author not in botusername:
-                        print('--Checking user: {}'.format(author), end=" ")
-                        user_srs_karma_balance = WatchedTreads.get_user_karma_balance(author=author,
-                                                                                      in_subreddit=thread.srs_subreddit)
-                        print(',/r/{0} karma score:{1} '.format(thread.srs_subreddit, user_srs_karma_balance), end=" ")
+            for author in WatchedTreads.get_authors_in_thread(thread=thread.thread_url):
+                if author not in thread.already_processed_users:
+                    print('--Checking user: {}'.format(author), end=" ")
+                    user_srs_karma_balance = WatchedTreads.get_user_karma_balance(author=author,
+                                                                                  in_subreddit=thread.srs_subreddit)
+                    print(',/r/{0} karma score:{1} '.format(thread.srs_subreddit, user_srs_karma_balance), end=" ")
 
-                        if user_srs_karma_balance >= karma_upper_limit:
-                            srs_users.append(author)
-                            print('MATCH', end=" ")
-                        print('.')
-                        thread.already_processed_users.append(author)
-            except:
-                ReddBot.debug('ERROR:couldnt scan all watched threads comments')
+                    if user_srs_karma_balance >= karma_upper_limit:
+                        srs_users.append(author)
+                        print('MATCH', end=" ")
+                    print('.')
+                    thread.already_processed_users.append(author)
+
             if srs_users:
                 splitted_comment = thread.bot_reply_body.split(split_mark, 1)
                 srs_users_lines = ''.join(['\n\n* ' + user for user in srs_users])
                 thread.bot_reply_body = splitted_comment[0] + srs_users_lines + split_mark + splitted_comment[1]
-                try:
-                    comment = socmedia.reddit_session.get_info(thing_id=thread.bot_reply_object_id)
-                    comment.edit(thread.bot_reply_body)
-                except:
-                    ReddBot.debug('ERROR: Cant edit brigade comment')
+                WatchedTreads.edit_comment(comment_id=thread.bot_reply_object_id, comment_body=thread.bot_reply_body)
+
             time_watched = now - thread.start_watch_time
             print('--Watched for {} hours'.format(time_watched/60/60))
             if time_watched > thread.keep_alive:  # if older than 8 hours
@@ -357,7 +371,7 @@ class ReddBot:
     @staticmethod
     def _maintenance_functions():
         def watchthreads():
-            WatchedTreads.update(botusername=botconfig.bot_auth_info['REDDIT_BOT_USERNAME'])
+            WatchedTreads.update()
 
         def reloadconfig():
             botconfig.check_for_updated_config()
