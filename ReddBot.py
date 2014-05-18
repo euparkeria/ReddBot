@@ -60,7 +60,7 @@ class ConfigFiles:
         if os.stat(DATAFILE).st_mtime > self.data_modified_time:
             self.redd_data = self.readdatafile()
             self.bot_auth_info = self.readauthfile()
-            ReddBot.debug('CONFIG FILES RELOADED!')
+            debug('CONFIG FILES RELOADED!')
             return True
 
 
@@ -127,7 +127,7 @@ class WatchedTreads:
                 if str(usercomment.subreddit) == in_subreddit:
                     user_srs_karma_balance += (usercomment.ups - usercomment.downs)
         except:
-            ReddBot.debug('ERROR: Cant get user SRS karma balance!!')
+            debug('ERROR: Cant get user SRS karma balance!!')
         return user_srs_karma_balance
 
     @staticmethod
@@ -141,7 +141,7 @@ class WatchedTreads:
                 if author not in botconfig.bot_auth_info['REDDIT_BOT_USERNAME']:
                     authors_list.append(author)
         except:
-            ReddBot.debug('ERROR:couldnt get all authors from thread')
+            debug('ERROR:couldnt get all authors from thread')
         return authors_list
 
     @staticmethod
@@ -151,7 +151,7 @@ class WatchedTreads:
             comment.edit(comment_body)
             print('Comment : {} edited.'.format(comment_id))
         except:
-            ReddBot.debug('ERROR: Cant edit comment')
+            debug('ERROR: Cant edit comment')
 
     @staticmethod
     def update():
@@ -352,21 +352,21 @@ class ReddBot:
             self._mainlooper()
 
     def _maintenance_loop(self):
-        self.debug('Maintenance loop')
+        debug('Maintenance loop')
         maint_timer = time.time()
         avg_subs_per_sec = self.permcounters['submissions'] / (time.time() - start_time)
-        self.debug('avg_subs_per_sec {}'.format(avg_subs_per_sec))
+        debug('avg_subs_per_sec {}'.format(avg_subs_per_sec))
         #try:
         for function in self._maintenance_functions():
             function()
         #except:
             #self.debug('Maintenance Loop Error')
         maint_timer = time.time() - maint_timer
-        self.debug('maint_seconds {}'.format(maint_timer))
+        debug('maint_seconds {}'.format(maint_timer))
 
         increase_pulllimit_by = int((maint_timer * avg_subs_per_sec) + 1)
         self.pulllimit['submissions'] += increase_pulllimit_by
-        self.debug('Pulllimit increased by:{}'.format(increase_pulllimit_by))
+        debug('Pulllimit increased by:{}'.format(increase_pulllimit_by))
 
     @staticmethod
     def _maintenance_functions():
@@ -387,12 +387,12 @@ class ReddBot:
             buffer_reset_lenght = self.pulllimit[loop] * 10
             if len(self.processed_objects[loop]) >= buffer_reset_lenght:
                 self.processed_objects[loop] = self.processed_objects[loop][int(len(self.processed_objects[loop]) / 2):]
-                self.debug('Buffers LENGHT after trim {0}'.format(len(self.processed_objects[loop])))
+                debug('Buffers LENGHT after trim {0}'.format(len(self.processed_objects[loop])))
             if not self.first_run:
                 self.pulllimit[loop] = self._calculate_pull_limit(self.cont_num[loop], target=loop)
             self.permcounters[loop] += self.cont_num[loop]
 
-        self.debug('{0}th sec. Sub so far:{1},THIS run:{2}.'
+        debug('{0}th sec. Sub so far:{1},THIS run:{2}.'
                    'Comments so far:{3},THIS run:{4}'
                    .format(int((time.time() - start_time)), self.permcounters['submissions'],
                            self.cont_num['submissions'], self.permcounters['comments'],
@@ -400,8 +400,8 @@ class ReddBot:
 
         self.first_run = False
 
-        self.debug(self.pulllimit['submissions'])
-        self.debug(self.pulllimit['comments'])
+        debug(self.pulllimit['submissions'])
+        debug(self.pulllimit['comments'])
 
         time.sleep(loop_timer)
 
@@ -470,40 +470,42 @@ class ReddBot:
                                                             bot_reply_object_id=reply.name,
                                                             bot_reply_body=reply.body)
 
-                    self.debug('AntiBrigadeBot NOTICE sent')
+                    debug('AntiBrigadeBot NOTICE sent')
                 except:
-                    self.log_this('Bot is BANNED in:{}, cant reply ):'.format(targeted_submission.subreddit))
+                    log_this('Bot is BANNED in:{}, cant reply ):'.format(targeted_submission.subreddit))
 
             if result.msg_for_tweet:
-                self.tweet_this(result.msg_for_tweet)
-                self.debug('New Topic Match in: {}'.format(result.args['dsubmission'].subreddit))
+                tweet_this(result.msg_for_tweet)
+                debug('New Topic Match in: {}'.format(result.args['dsubmission'].subreddit))
 
-    @staticmethod
-    def debug(debugtext, level=DEBUG_LEVEL):
-        if level >= 1:
-            print('* {}'.format(debugtext))
 
-    @staticmethod
-    def log_this(logtext):
-        with open('LOG.txt', 'a') as logfile:
-            logfile.write('{0}: {1}\n'.format(time.ctime(), logtext))
-        ReddBot.debug('LOOGGED {}'.format(logtext))
+def send_pm_to_owner(pm_text):
+    try:
+        socmedia.reddit_session.send_message(botconfig.bot_auth_info['REDDIT_PM_TO'], pm_text)
+    except:
+        print('ERROR:Cant send pm')
 
-    def tweet_this(self, msg):
-        if len(msg) > 140:
-            msg = msg[:139]
-            self.debug('MSG exceeding 140 characters!!')
-        try:
-            socmedia.twitter_session.update_status(status=msg)
-            self.debug('TWEET SENT!!!')
-        except:
-            print('ERROR: couldnt update twitter status')
 
-    def send_pm_to_owner(self, pm_text):
-        try:
-            socmedia.reddit_session.send_message(botconfig.bot_auth_info['REDDIT_PM_TO'], pm_text)
-        except:
-            print('ERROR:Cant send pm')
+def tweet_this(msg):
+    if len(msg) > 140:
+        msg = msg[:139]
+        debug('MSG exceeding 140 characters!!')
+    try:
+        socmedia.twitter_session.update_status(status=msg)
+        debug('TWEET SENT!!!')
+    except:
+        print('ERROR: couldnt update twitter status')
+
+
+def log_this(logtext):
+    with open('LOG.txt', 'a') as logfile:
+        logfile.write('{0}: {1}\n'.format(time.ctime(), logtext))
+    debug('LOOGGED {}'.format(logtext))
+
+
+def debug(debugtext, level=DEBUG_LEVEL):
+    if level >= 1:
+        print('* {}'.format(debugtext))
 
 
 start_time = time.time()
