@@ -20,6 +20,7 @@ AUTHFILE = 'ReddAUTH.json'
 DATAFILE = 'ReddDATA.json'
 
 
+
 class SocialMedia:
     def __init__(self):
         self.reddit_session = self.connect_to_reddit()
