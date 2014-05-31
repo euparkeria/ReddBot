@@ -20,7 +20,6 @@ AUTHFILE = 'ReddAUTH.json'
 DATAFILE = 'ReddDATA.json'
 
 
-
 class SocialMedia:
     def __init__(self):
         self.reddit_session = self.connect_to_reddit()
@@ -104,7 +103,7 @@ class WatchedTreads:
         self.already_processed_users = []
         self.bot_reply_object_id = bot_reply_object_id
         self.bot_reply_body = bot_reply_body
-        self.keep_alive = 28800  # time to watch thread in seconds
+        self.keep_alive = 28800  # time to watch a thread in seconds
 
         WatchedTreads.watched_threads_list.append(self)
         self.savecache()
@@ -158,7 +157,6 @@ class WatchedTreads:
     def update():
         print('Currently Watching {} threads.'.format(len(WatchedTreads.watched_threads_list)))
         split_mark = '\n\n-----\n'
-        now = time.time()
         karma_upper_limit = 5  # if poster has more than that amount of karma in the srs subreddit he is added
 
         for thread in WatchedTreads.watched_threads_list:
@@ -183,7 +181,7 @@ class WatchedTreads:
                 thread.bot_reply_body = splitted_comment[0] + srs_users_lines + split_mark + splitted_comment[1]
                 WatchedTreads.edit_comment(comment_id=thread.bot_reply_object_id, comment_body=thread.bot_reply_body)
 
-            time_watched = now - thread.start_watch_time
+            time_watched = time.time() - thread.start_watch_time
             print('--Watched for {} hours'.format(time_watched/60/60))
             if time_watched > thread.keep_alive:  # if older than 8 hours
                 WatchedTreads.watched_threads_list.remove(thread)
@@ -277,18 +275,18 @@ class MatchedSubmissions:
 
         topicname = remove_punctuation(topicname.lower())
 
-        for i in range(len(quotes)):
-            q = remove_punctuation(quotes[i].lower())
+        for quote in quotes:
+            q = remove_punctuation(quote.lower())
             match = longest_common_substring(topicname, q)
 
             if match:
                 match = match.split()
-
-                if len(max(match, key=len)) >= 4:
+                if match and len(max(match, key=len)) >= 4:
                     match = ' '.join(match)
-                    quotes_matched[match + "{:.>4}".format(i)] = quotes[i]
+                    quotes_matched[match + "{:.>4}".format(quotes.index(quote))] = quote
 
         if quotes_matched:
+
             keys = list(quotes_matched.keys())
             longst_key_lenght = len(max(keys, key=len))
             longest_keys = [key for key in keys if len(key) >= longst_key_lenght - 2]  # all longest and longest - 2
@@ -419,12 +417,20 @@ class ReddBot:
             self.pulllimit[target] = lastpullnum + add_more[target]
         return int(self.pulllimit[target])
 
-    def _get_new_comments_or_subs(self, target):
+    @staticmethod
+    def get_comments_or_subs(placeholder_id='', subreddit=watched_subreddit,
+                             limit=results_limit, target='submissions'):
         if target == 'submissions':
-            results = socmedia.reddit_session.get_subreddit(watched_subreddit).get_new(limit=self.pulllimit[target],
-                                                                                       place_holder=self.placeholder_id)
+            return socmedia.reddit_session.get_subreddit(subreddit).get_new(limit=limit,
+                                                                            place_holder=placeholder_id)
         if target == 'comments':
-            results = socmedia.reddit_session.get_comments(watched_subreddit, limit=self.pulllimit[target])
+            return socmedia.reddit_session.get_comments(subreddit, limit=limit)
+
+    def _get_new_comments_or_subs(self, target):
+
+        results = ReddBot.get_comments_or_subs(placeholder_id=self.placeholder_id, subreddit=watched_subreddit,
+                                               limit=self.pulllimit[target], target=target)
+
         new_submissions_list = []
         try:
             for submission in results:
