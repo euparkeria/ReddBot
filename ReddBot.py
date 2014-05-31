@@ -336,7 +336,7 @@ class ReddBot:
         self.pulllimit = {'submissions': results_limit, 'comments': results_limit_comm}
         self.cont_num = {'comments': 0, 'submissions': 0}
         self.processed_objects = {'comments': [], 'submissions': []}
-        self.loops = ['submissions', 'comments']  # 'submissions' and 'comments' loops
+        self.loops = ['submissions']  # 'submissions' and 'comments' loops
         self.permcounters = {'comments': 0, 'submissions': 0}
         self.twitter = None
         self.placeholder_id = None  # this doesn't always work !? but it will lower the traffic to some extent
