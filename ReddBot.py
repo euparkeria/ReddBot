@@ -304,7 +304,7 @@ class MatchedSubmissions:
                 print(keyword_matches_keys)
                 quote_to_return = quotes_matched[choice(keyword_matches_keys)]
             else:
-                longest_keys = [key for key in keys if len(key) >= len(max(keys, key=len)) - 0]  # all longest
+                longest_keys = [key for key in keys if len(key) >= len(max(keys, key=len)) - 1]  # all longest
                 print(longest_keys)
                 quote_to_return = quotes_matched[choice(longest_keys)]
 
