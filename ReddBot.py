@@ -248,6 +248,7 @@ class MatchedSubmissions:
 
     @staticmethod
     def _find_good_quote(quotes, topicname):
+
         quotes_matched = {}
 
         def remove_punctuation(quote):
@@ -275,23 +276,37 @@ class MatchedSubmissions:
 
         topicname = remove_punctuation(topicname.lower())
 
+        keyword_matched = False
+
         for quote in quotes:
             q = remove_punctuation(quote.lower())
             match = longest_common_substring(topicname, q)
 
             if match:
+
                 match = match.split()
+                #match = [x for x in match if len(x) > 1]
                 if match and len(max(match, key=len)) >= 4:
-                    match = ' '.join(match)
-                    quotes_matched[match + "{:.>4}".format(quotes.index(quote))] = quote
+                    for word in match:
+                        if word in botconfig.redd_data['KEYWORDS']:
+                            quotes_matched[word + "-KEYWORD"] = quote
+                            keyword_matched = True
+                    if not keyword_matched:
+                        match = ' '.join(match)
+                        quotes_matched[match + "{:.>5}".format(quotes.index(quote))] = quote
 
         if quotes_matched:
 
             keys = list(quotes_matched.keys())
-            longst_key_lenght = len(max(keys, key=len))
-            longest_keys = [key for key in keys if len(key) >= longst_key_lenght - 2]  # all longest and longest - 2
-            print(longest_keys)
-            quote_to_return = quotes_matched[choice(longest_keys)]
+
+            if keyword_matched:
+                keyword_matches_keys = [key for key in keys if '-KEYWORD' in key]
+                print(keyword_matches_keys)
+                quote_to_return = quotes_matched[choice(keyword_matches_keys)]
+            else:
+                longest_keys = [key for key in keys if len(key) >= len(max(keys, key=len)) - 0]  # all longest
+                print(longest_keys)
+                quote_to_return = quotes_matched[choice(longest_keys)]
 
         else:
             quote_to_return = choice(quotes)
