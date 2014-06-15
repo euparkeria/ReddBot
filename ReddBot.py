@@ -177,7 +177,8 @@ class WatchedTreads:
 
             if srs_users:
                 splitted_comment = thread.bot_reply_body.split(split_mark, 1)
-                srs_users_lines = ''.join(['\n\n* ' + user for user in srs_users])
+                srs_users_lines = ''.join(['\n\n* [' + user + '](http://np.reddit.com/u/' + user + ')'
+                                           for user in srs_users])
                 thread.bot_reply_body = splitted_comment[0] + srs_users_lines + split_mark + splitted_comment[1]
                 WatchedTreads.edit_comment(comment_id=thread.bot_reply_object_id, comment_body=thread.bot_reply_body)
 
@@ -315,16 +316,17 @@ class MatchedSubmissions:
     def _brigade_message(self):
         if self.is_srs:
             quote = self._find_good_quote(self.args['keyword_lists']['quotes'], self.args['dsubmission'].title)
-            submissionlink = self.args['dsubmission'].permalink.replace('http://www.reddit.com', 'http://np.reddit.com')
+            submissionlink = make_np(self.args['dsubmission'].permalink)
+            brigade_subreddit_link = '*[/r/{0}]({1})*'.format(self.args['dsubmission'].subreddit, submissionlink)
 
             self.msg_for_reply = "#**NOTICE**:\nThis thread is the target of a possible downvote brigade from " \
-                                 "[/r/{0}]({1})^submission ^linked\n\n" \
-                "**Submission Title:**\n\n* *{3}*\n\n**Members of *{0}* involved in this thread:**" \
-                "^list ^updated ^every ^5 ^minutes ^for ^8 ^hours\n\n \n\n-----\n ^★ *{2}* ^★"\
-                .format(self.args['dsubmission'].subreddit,
-                submissionlink,
-                quote,
-                self.args['dsubmission'].title)
+                                 "{2}^submission ^linked\n\n" \
+                "**Submission Title:**\n\n* *{1}*\n\n**Members of {2}" \
+                " involved in this thread:**" \
+                "^list ^updated ^every ^5 ^minutes ^for ^8 ^hours\n\n \n\n-----\n ^★ *{0}* ^★"\
+                .format(quote,
+                self.args['dsubmission'].title,
+                brigade_subreddit_link)
             return True
         return False
 
@@ -506,6 +508,10 @@ def send_pm_to_owner(pm_text):
         socmedia.reddit_session.send_message(botconfig.bot_auth_info['REDDIT_PM_TO'], pm_text)
     except:
         print('ERROR:Cant send pm')
+
+
+def make_np(link):
+    return link.replace('http://www.reddit.com', 'http://np.reddit.com')
 
 
 def tweet_this(msg):
