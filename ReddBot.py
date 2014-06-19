@@ -177,7 +177,7 @@ class WatchedTreads:
 
             if srs_users:
                 splitted_comment = thread.bot_reply_body.split(split_mark, 1)
-                srs_users_lines = ''.join(['\n\n* [' + user + '](http://np.reddit.com/u/' + user + ')'
+                srs_users_lines = ''.join(['\n\n* [/u/' + user + '](http://np.reddit.com/u/' + user + ')'
                                            for user in srs_users])
                 thread.bot_reply_body = splitted_comment[0] + srs_users_lines + split_mark + splitted_comment[1]
                 WatchedTreads.edit_comment(comment_id=thread.bot_reply_object_id, comment_body=thread.bot_reply_body)
