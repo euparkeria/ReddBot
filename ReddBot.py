@@ -5,11 +5,12 @@ import praw
 import json
 import os
 import pickle
+import re
 from random import choice
 from twython import Twython
 
 watched_subreddit = 'all'
-results_limit = 400
+results_limit = 800
 results_limit_comm = 900
 bot_agent_name = 'antibrigadebot 2.0 /u/antibrigadebot2'
 loop_timer = 60
@@ -196,9 +197,12 @@ class MatchedSubmissions:
 
     def __init__(self, dsubmission, target, keyword_lists):
         self.args = {'dsubmission': dsubmission, 'target': target, 'keyword_lists': keyword_lists}
+        self.body_text = self._get_body_text()
+        self.url = self._get_clean_url()
+
         self.is_srs = False
         self.keyword_matched = False
-        self.body_text = self._get_body_text()
+
         self.msg_for_tweet = None
         self.msg_for_reply = None
 
@@ -222,6 +226,10 @@ class MatchedSubmissions:
         if self.args['target'] == 'comments':
             return self.args['dsubmission'].permalink
 
+    def _get_clean_url(self):
+        clean_url = re.sub(r'\?(.*)', '', self.args['dsubmission'].url)
+        return clean_url
+
     def _get_body_text(self):
         if self.args['target'] == 'submissions':
             return self.args['dsubmission'].title + self.args['dsubmission'].selftext
@@ -237,7 +245,7 @@ class MatchedSubmissions:
 
     def _detect_brigade(self):
         subreddit = str(self.args['dsubmission'].subreddit)
-        if subreddit.lower() in self.args['keyword_lists']['SRSs'] and 'reddit.com' in self.args['dsubmission'].url \
+        if subreddit.lower() in self.args['keyword_lists']['SRSs'] and 'reddit.com' in self.url \
                 and not self.args['dsubmission'].is_self:
             self.is_srs = True
             return True
@@ -478,17 +486,20 @@ class ReddBot:
     @staticmethod
     def commenter(obj, msg):
         if len(obj.comments) > 1:
+            print('ADD to ID:{0}'.format(obj.comments[0].id))
             return obj.add_comment(msg)
         else:
+            print('REPLY to ID:{0}'.format(obj.comments[0].id))
             return obj.comments[0].reply(msg)
 
     def dispatch_nitifications(self, results_list):
         for result in results_list:
             if result.msg_for_reply:
-                targeted_submission = socmedia.reddit_session.get_submission(result.args['dsubmission'].url)
+                targeted_submission = socmedia.reddit_session.get_submission(result.url)
+                print(result.url)
                 try:
                     reply = self.commenter(obj=targeted_submission, msg=result.msg_for_reply)
-                    add_thread_to_watchlist = WatchedTreads(thread_url=result.args['dsubmission'].url,
+                    add_thread_to_watchlist = WatchedTreads(thread_url=result.url,
                                                             srs_subreddit=str(result.args['dsubmission'].subreddit),
                                                             srs_author=str(result.args['dsubmission'].author),
                                                             bot_reply_object_id=reply.name,
