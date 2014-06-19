@@ -125,7 +125,7 @@ class WatchedTreads:
         try:
             for usercomment in user.get_comments(limit=user_comments_limit):
                 if str(usercomment.subreddit) == in_subreddit:
-                    user_srs_karma_balance += (usercomment.ups - usercomment.downs)
+                    user_srs_karma_balance += usercomment.score
         except:
             debug('ERROR: Cant get user SRS karma balance!!')
         return user_srs_karma_balance
