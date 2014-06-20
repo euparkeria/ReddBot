@@ -9,7 +9,8 @@ import re
 from random import choice
 from twython import Twython
 
-watched_subreddit = 'all'
+
+watched_subreddit = "+".join(['all'])
 results_limit = 800
 results_limit_comm = 900
 bot_agent_name = 'antibrigadebot 2.0 /u/antibrigadebot2'
