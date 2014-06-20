@@ -31,8 +31,9 @@ class SocialMedia:
         try:
             r = praw.Reddit(user_agent=bot_agent_name, api_request_delay=1)
             r.login(botconfig.bot_auth_info['REDDIT_BOT_USERNAME'], botconfig.bot_auth_info['REDDIT_BOT_PASSWORD'])
+            debug('Logged in as {0}'.format(botconfig.bot_auth_info['REDDIT_BOT_USERNAME']))
         except:
-            print('ERROR: Cant login to Reddit.com')
+            debug('ERROR: Cant login to Reddit.com')
         return r
 
     @staticmethod
@@ -41,7 +42,7 @@ class SocialMedia:
             t = Twython(botconfig.bot_auth_info['APP_KEY'], botconfig.bot_auth_info['APP_SECRET'],
                         botconfig.bot_auth_info['OAUTH_TOKEN'], botconfig.bot_auth_info['OAUTH_TOKEN_SECRET'])
         except:
-            print('ERROR: Cant authenticate into twitter')
+            debug('ERROR: Cant authenticate into twitter')
         return t
 
 
@@ -64,7 +65,6 @@ class ConfigFiles:
             debug('CONFIG FILES RELOADED!')
             return True
 
-
     @staticmethod
     def readauthfile():
         with open(AUTHFILE, 'r', encoding='utf-8') as f:
@@ -77,7 +77,7 @@ class ConfigFiles:
             with open(CACHEFILE, 'rb') as f:
                 return pickle.load(f)
         except:
-            print('Cache File not Pressent')
+            debug('Cache File not Pressent')
             return False
 
     def readdatafile(self):
@@ -89,7 +89,7 @@ class ConfigFiles:
                 redd_data['SRSs'] = [x.lower() for x in redd_data['SRSs']]
                 #redd_data['quotes'] = [''.join(('^', x.replace(" ", " ^"))) for x in redd_data['quotes']]
         except:
-            print("Error reading data file")
+            debug("Error reading data file")
         return redd_data
 
 
@@ -108,7 +108,7 @@ class WatchedTreads:
 
         WatchedTreads.watched_threads_list.append(self)
         self.savecache()
-        print('new watch object added')
+        debug('new watch object added')
 
     @staticmethod
     def savecache():
@@ -116,7 +116,7 @@ class WatchedTreads:
             with open(CACHEFILE, 'wb') as fa:
                 pickle.dump(WatchedTreads.watched_threads_list, fa)
         except:
-            print('ERROR: Cant write cache file')
+            debug('ERROR: Cant write cache file')
 
     @staticmethod
     def get_user_karma_balance(author, in_subreddit):
@@ -150,30 +150,30 @@ class WatchedTreads:
         try:
             comment = socmedia.reddit_session.get_info(thing_id=comment_id)
             comment.edit(comment_body)
-            print('Comment : {} edited.'.format(comment_id))
+            debug('Comment : {} edited.'.format(comment_id))
         except:
             debug('ERROR: Cant edit comment')
 
     @staticmethod
     def update():
-        print('Currently Watching {} threads.'.format(len(WatchedTreads.watched_threads_list)))
+        debug('Currently Watching {} threads.'.format(len(WatchedTreads.watched_threads_list)))
         split_mark = '\n\n-----\n'
         karma_upper_limit = 5  # if poster has more than that amount of karma in the srs subreddit he is added
 
         for thread in WatchedTreads.watched_threads_list:
             srs_users = []
-            print('Now processing: {}'.format(thread.thread_url))
+            debug('Now processing: {}'.format(thread.thread_url))
             for author in WatchedTreads.get_authors_in_thread(thread=thread.thread_url):
                 if author not in thread.already_processed_users:
-                    print('--Checking user: {}'.format(author), end=" ")
+                    debug('--Checking user: {}'.format(author), end=" ")
                     user_srs_karma_balance = WatchedTreads.get_user_karma_balance(author=author,
                                                                                   in_subreddit=thread.srs_subreddit)
-                    print(',/r/{0} karma score:{1} '.format(thread.srs_subreddit, user_srs_karma_balance), end=" ")
+                    debug(',/r/{0} karma score:{1} '.format(thread.srs_subreddit, user_srs_karma_balance), end=" ")
 
                     if user_srs_karma_balance >= karma_upper_limit:
                         srs_users.append(author)
-                        print('MATCH', end=" ")
-                    print('.')
+                        debug('MATCH', end=" ")
+                    debug('.')
                     thread.already_processed_users.append(author)
 
             if srs_users:
@@ -184,10 +184,10 @@ class WatchedTreads:
                 WatchedTreads.edit_comment(comment_id=thread.bot_reply_object_id, comment_body=thread.bot_reply_body)
 
             time_watched = time.time() - thread.start_watch_time
-            print('--Watched for {} hours'.format(time_watched/60/60))
+            debug('--Watched for {} hours'.format(time_watched/60/60))
             if time_watched > thread.keep_alive:  # if older than 8 hours
                 WatchedTreads.watched_threads_list.remove(thread)
-                print('--Watched Thread Removed!')
+                debug('--Watched Thread Removed!')
         WatchedTreads.savecache()
 
 
@@ -310,11 +310,11 @@ class MatchedSubmissions:
 
             if keyword_matched:
                 keyword_matches_keys = [key for key in keys if '-KEYWORD' in key]
-                print(keyword_matches_keys)
+                debug(keyword_matches_keys)
                 quote_to_return = quotes_matched[choice(keyword_matches_keys)]
             else:
                 longest_keys = [key for key in keys if len(key) >= len(max(keys, key=len)) - 1]  # all longest
-                print(longest_keys)
+                debug(longest_keys)
                 quote_to_return = quotes_matched[choice(longest_keys)]
 
         else:
@@ -466,7 +466,7 @@ class ReddBot:
             if new_submissions_list:
                 self.placeholder_id = new_submissions_list[0].id
         except:
-            print('ERROR:Cannot connect to reddit!!!')
+            debug('ERROR:Cannot connect to reddit!!!')
         return new_submissions_list
 
     def _contentloop(self, target):
@@ -475,35 +475,33 @@ class ReddBot:
         if new_submissions:
 
             for new_submission in new_submissions:
-                result_object = MatchedSubmissions(target=target,
-                                                   dsubmission=new_submission,
-                                                   keyword_lists=botconfig.redd_data)
+                MatchedSubmissions(target=target, dsubmission=new_submission, keyword_lists=botconfig.redd_data)
 
-            if result_object.matching_results:
-                self.dispatch_nitifications(results_list=result_object.matching_results)
-                result_object.purge_list()
+            if MatchedSubmissions.matching_results:
+                self.dispatch_nitifications(results_list=MatchedSubmissions.matching_results)
+                MatchedSubmissions.purge_list()
 
     @staticmethod
     def commenter(obj, msg):
         if len(obj.comments) > 1:
-            print('ADD to ID:{0}'.format(obj.comments[0].id))
+            debug('ADD to ID:{0}'.format(obj.comments[0].id))
             return obj.add_comment(msg)
         else:
-            print('REPLY to ID:{0}'.format(obj.comments[0].id))
+            debug('REPLY to ID:{0}'.format(obj.comments[0].id))
             return obj.comments[0].reply(msg)
 
     def dispatch_nitifications(self, results_list):
         for result in results_list:
             if result.msg_for_reply:
                 targeted_submission = socmedia.reddit_session.get_submission(result.url)
-                print(result.url)
+                debug(result.url)
                 try:
                     reply = self.commenter(obj=targeted_submission, msg=result.msg_for_reply)
-                    add_thread_to_watchlist = WatchedTreads(thread_url=result.url,
-                                                            srs_subreddit=str(result.args['dsubmission'].subreddit),
-                                                            srs_author=str(result.args['dsubmission'].author),
-                                                            bot_reply_object_id=reply.name,
-                                                            bot_reply_body=reply.body)
+                    WatchedTreads(thread_url=result.url,
+                                  srs_subreddit=str(result.args['dsubmission'].subreddit),
+                                  srs_author=str(result.args['dsubmission'].author),
+                                  bot_reply_object_id=reply.name,
+                                  bot_reply_body=reply.body)
 
                     debug('AntiBrigadeBot NOTICE sent')
                 except:
@@ -518,7 +516,7 @@ def send_pm_to_owner(pm_text):
     try:
         socmedia.reddit_session.send_message(botconfig.bot_auth_info['REDDIT_PM_TO'], pm_text)
     except:
-        print('ERROR:Cant send pm')
+        debug('ERROR:Cant send pm')
 
 
 def make_np(link):
@@ -533,7 +531,7 @@ def tweet_this(msg):
         socmedia.twitter_session.update_status(status=msg)
         debug('TWEET SENT!!!')
     except:
-        print('ERROR: couldnt update twitter status')
+        debug('ERROR: couldnt update twitter status')
 
 
 def log_this(logtext):
@@ -542,9 +540,9 @@ def log_this(logtext):
     debug('LOOGGED {}'.format(logtext))
 
 
-def debug(debugtext, level=DEBUG_LEVEL):
+def debug(debugtext, level=DEBUG_LEVEL, end='\n'):
     if level >= 1:
-        print('* {}'.format(debugtext))
+        print('* {}'.format(debugtext), end=end)
 
 
 start_time = time.time()
