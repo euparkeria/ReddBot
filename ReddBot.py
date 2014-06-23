@@ -123,8 +123,9 @@ class WatchedTreads:
     def get_user_karma_balance(author, in_subreddit):
         user_comments_limit = 200
         user_srs_karma_balance = 0
-        user = socmedia.reddit_session.get_redditor(author)
+
         try:
+            user = socmedia.reddit_session.get_redditor(author)
             for usercomment in user.get_comments(limit=user_comments_limit):
                 if str(usercomment.subreddit) == in_subreddit:
                     user_srs_karma_balance += usercomment.score
