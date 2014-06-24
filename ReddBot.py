@@ -1,5 +1,3 @@
-__author__ = 'mekoneko'
-
 import time
 import praw
 import json
@@ -297,7 +295,7 @@ class MatchedSubmissions:
 
                 match = match.split()
                 #match = [x for x in match if len(x) > 1]
-                if match and len(max(match, key=len)) >= 4:
+                if match and len(max(match, key=len)) >= 5:
                     for word in match:
                         if word in botconfig.redd_data['KEYWORDS']:
                             quotes_matched[word + "-KEYWORD"] = quote
@@ -312,11 +310,11 @@ class MatchedSubmissions:
 
             if keyword_matched:
                 keyword_matches_keys = [key for key in keys if '-KEYWORD' in key]
-                debug(keyword_matches_keys)
+                log_this(keyword_matches_keys)
                 quote_to_return = quotes_matched[choice(keyword_matches_keys)]
             else:
                 longest_keys = [key for key in keys if len(key) >= len(max(keys, key=len)) - 1]  # all longest
-                debug(longest_keys)
+                log_this(longest_keys)
                 quote_to_return = quotes_matched[choice(longest_keys)]
 
         else:
