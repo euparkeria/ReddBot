@@ -294,8 +294,8 @@ class MatchedSubmissions:
             if match:
 
                 match = match.split()
-                #match = [x for x in match if len(x) > 1]
-                if match and len(max(match, key=len)) >= 5:
+                match = [x for x in match if len(x) > 2]
+                if match and len(max(match, key=len)) >= 6:
                     for word in match:
                         if word in botconfig.redd_data['KEYWORDS']:
                             quotes_matched[word + "-KEYWORD"] = quote
