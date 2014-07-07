@@ -292,20 +292,17 @@ class MatchedSubmissions:
             match = longest_common_substring(topicname, q)
 
             if match:
-
-                match = match.split()
-                match = [x for x in match if len(x) > 2]
-                if match and len(max(match, key=len)) >= 6:
-                    for word in match:
-                        if word in botconfig.redd_data['KEYWORDS']:
-                            quotes_matched[word + "-KEYWORD"] = quote
+                match = [x for x in match.split() if len(x) > 2]  # list of words of the match that are > 2 characters
+                if match and len(max(match, key=len)) >= 6:  # if there is a word of at least 6 characters
+                    match = ' '.join(match)
+                    for keyword in botconfig.redd_data['KEYWORDS']:
+                        if longest_common_substring(keyword.lower(), match.lower()) in botconfig.redd_data['KEYWORDS']:
+                            quotes_matched[keyword + "-KEYWORD{:.>5}".format(quotes.index(quote))] = quote
                             keyword_matched = True
                     if not keyword_matched:
-                        match = ' '.join(match)
                         quotes_matched[match + "{:.>5}".format(quotes.index(quote))] = quote
 
         if quotes_matched:
-
             keys = list(quotes_matched.keys())
 
             if keyword_matched:
@@ -320,6 +317,7 @@ class MatchedSubmissions:
         else:
             quote_to_return = choice(quotes)
         return ''.join(('^', quote_to_return.replace(" ", " ^")))
+
 
     def _brigade_message(self):
         if self.is_srs:
