@@ -339,14 +339,14 @@ class MatchedSubmissions:
     def _keyword_match_tweet(self):
         if self.keyword_matched and not self.is_srs:
             self.msg_for_tweet = 'Submission regarding #{0} posted in /r/{1} : {2} #reddit'.format(
-                self.keyword_matched, self.args['dsubmission'].subreddit, self.link)
+                self.keyword_matched.replace(' ', '_'), self.args['dsubmission'].subreddit, self.link)
             return True
         return False
 
     def _brigade_tweet(self):
         if self.is_srs and self.keyword_matched:
             self.msg_for_tweet = 'ATTENTION: possible reactionary brigade from /r/{1} regarding #{0}: {2} #reddit'\
-                .format(self.keyword_matched, self.args['dsubmission'].subreddit, self.link)
+                .format(self.keyword_matched.replace(' ', '_'), self.args['dsubmission'].subreddit, self.link)
 
             return True
         return False
