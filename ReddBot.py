@@ -318,7 +318,6 @@ class MatchedSubmissions:
             quote_to_return = choice(quotes)
         return ''.join(('^', quote_to_return.replace(" ", " ^")))
 
-
     def _brigade_message(self):
         if self.is_srs:
             quote = self._find_good_quote(self.args['keyword_lists']['quotes'], self.args['dsubmission'].title)
@@ -329,7 +328,8 @@ class MatchedSubmissions:
                                  "{2}^submission ^linked\n\n" \
                 "**Submission Title:**\n\n* *{1}*\n\n**Members of {2}" \
                 " involved in this thread:**" \
-                "^list ^updated ^every ^5 ^minutes ^for ^8 ^hours\n\n \n\n-----\n ^★ *{0}* ^★"\
+                "^list ^updated ^every ^5 ^minutes ^for ^8 ^hours\n\n \n\n-----\n ^★ *{0}* ^★\n\n " \
+                "[**^|bot ^twitter ^feed|**](https://twitter.com/bot_redd)"\
                 .format(quote,
                 self.args['dsubmission'].title,
                 brigade_subreddit_link)
