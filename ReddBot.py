@@ -329,7 +329,7 @@ class MatchedSubmissions:
                 "**Submission Title:**\n\n* *{1}*\n\n**Members of {2}" \
                 " involved in this thread:**" \
                 "^list ^updated ^every ^5 ^minutes ^for ^8 ^hours\n\n \n\n-----\n ^★ *{0}* ^★\n\n " \
-                "[**^|bot ^twitter ^feed|**](https://twitter.com/bot_redd)"\
+                "[^|bot ^twitter ^feed|](https://twitter.com/bot_redd)"\
                 .format(quote,
                 self.args['dsubmission'].title,
                 brigade_subreddit_link)
