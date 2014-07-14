@@ -494,19 +494,21 @@ class ReddBot:
                 try:
                     targeted_submission = socmedia.reddit_session.get_submission(result.url)
                 except:
-                    debug('ERROR: cant get submission by url, Invalid comment url!?')
+                    debug('ERROR: cant get submission by url, Invalid submission url!?')
+                    targeted_submission = None
                 debug(result.url)
-                try:
-                    reply = self.commenter(obj=targeted_submission, msg=result.msg_for_reply)
-                    WatchedTreads(thread_url=result.url,
-                                  srs_subreddit=str(result.args['dsubmission'].subreddit),
-                                  srs_author=str(result.args['dsubmission'].author),
-                                  bot_reply_object_id=reply.name,
-                                  bot_reply_body=reply.body)
+                if targeted_submission:
+                    try:
+                        reply = self.commenter(obj=targeted_submission, msg=result.msg_for_reply)
+                        WatchedTreads(thread_url=result.url,
+                                      srs_subreddit=str(result.args['dsubmission'].subreddit),
+                                      srs_author=str(result.args['dsubmission'].author),
+                                      bot_reply_object_id=reply.name,
+                                      bot_reply_body=reply.body)
 
-                    debug('AntiBrigadeBot NOTICE sent')
-                except:
-                    log_this('Bot is BANNED in:{}, cant reply ):'.format(targeted_submission.subreddit))
+                        debug('AntiBrigadeBot NOTICE sent')
+                    except:
+                        log_this('Bot is BANNED in:{}, cant reply ):'.format(targeted_submission.subreddit))
 
             if result.msg_for_tweet:
                 tweet_this(result.msg_for_tweet)
