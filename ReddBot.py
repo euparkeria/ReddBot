@@ -491,7 +491,10 @@ class ReddBot:
     def dispatch_nitifications(self, results_list):
         for result in results_list:
             if result.msg_for_reply:
-                targeted_submission = socmedia.reddit_session.get_submission(result.url)
+                try:
+                    targeted_submission = socmedia.reddit_session.get_submission(result.url)
+                except:
+                    debug('ERROR: cant get submission by url, Invalid comment url!?')
                 debug(result.url)
                 try:
                     reply = self.commenter(obj=targeted_submission, msg=result.msg_for_reply)
