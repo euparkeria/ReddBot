@@ -31,7 +31,7 @@ class SocialMedia:
             r = praw.Reddit(user_agent=bot_agent_name, api_request_delay=1)
             r.login(botconfig.bot_auth_info['REDDIT_BOT_USERNAME'], botconfig.bot_auth_info['REDDIT_BOT_PASSWORD'])
             debug('Logged in as {0}'.format(botconfig.bot_auth_info['REDDIT_BOT_USERNAME']))
-        except praw.errors.APIException:
+        except:
             debug('ERROR: Cant login to Reddit.com')
         return r
 
@@ -127,7 +127,7 @@ class WatchedTreads:
             for usercomment in user.get_comments(limit=user_comments_limit):
                 if str(usercomment.subreddit) == in_subreddit:
                     user_srs_karma_balance += usercomment.score
-        except praw.errors.InvalidUser:
+        except:
             debug('ERROR: Cant get user SRS karma balance!!')
         return user_srs_karma_balance
 
@@ -141,7 +141,7 @@ class WatchedTreads:
                 author = str(comment.author)
                 if author not in botconfig.bot_auth_info['REDDIT_BOT_USERNAME']:
                     authors_list.append(author)
-        except praw.errors.APIException:
+        except:
             debug('ERROR:couldnt get all authors from thread')
         return authors_list
 
@@ -151,7 +151,7 @@ class WatchedTreads:
             comment = socmedia.reddit_session.get_info(thing_id=comment_id)
             comment.edit(comment_body)
             debug('Comment : {} edited.'.format(comment_id))
-        except praw.errors.APIException:
+        except:
             debug('ERROR: Cant edit comment')
 
     @staticmethod
@@ -463,7 +463,7 @@ class ReddBot:
                     self.cont_num[target] += 1   # count the number of submissions processed each run
             if new_submissions_list:
                 self.placeholder_id = new_submissions_list[0].id
-        except praw.errors.APIException:
+        except:
             debug('ERROR:Cannot connect to reddit!!!')
         return new_submissions_list
 
@@ -493,7 +493,7 @@ class ReddBot:
             if result.msg_for_reply:
                 try:
                     targeted_submission = socmedia.reddit_session.get_submission(result.url)
-                except praw.errors.APIException:
+                except:
                     debug('ERROR: cant get submission by url, Invalid submission url!?')
                     targeted_submission = None
                 debug(result.url)
@@ -518,7 +518,7 @@ class ReddBot:
 def send_pm_to_owner(pm_text):
     try:
         socmedia.reddit_session.send_message(botconfig.bot_auth_info['REDDIT_PM_TO'], pm_text)
-    except praw.errors.APIException:
+    except:
         debug('ERROR:Cant send pm')
 
 
