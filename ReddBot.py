@@ -92,6 +92,70 @@ class ConfigFiles:
         return redd_data
 
 
+class QuoteBank:
+    def __init__(self):
+        self.quotes_matched = {}
+        self.keyword_matched = False
+
+    @staticmethod
+    def lcs(s1, s2):
+        m = [[0] * (len(s2) + 1) for i in range(len(s1) + 1)]
+        longest, x_longest = 0, 0
+        for x in range(1, len(s1) + 1):
+            for y in range(1, len(s2) + 1):
+                if s1[x - 1] == s2[y - 1]:
+                    m[x][y] = m[x - 1][y - 1] + 1
+                    if m[x][y] > longest:
+                        longest = m[x][y]
+                        x_longest = x
+                else:
+                    m[x][y] = 0
+        return s1[x_longest - longest: x_longest]
+
+    @staticmethod
+    def remove_punctuation(quote):
+        punctuation = "!\"#$%&'()*+,-.:;<=>?@[\\]^_`{|}~"
+        punct_clear = ""
+        for letter in quote:
+            if letter not in punctuation:
+                punct_clear += letter
+        #return punct_clear.split()
+        return punct_clear
+
+    def get_quote(self, quotes, topicname):
+        topicname = self.remove_punctuation(topicname.lower())
+        for quote in quotes:
+            q = self.remove_punctuation(quote.lower())
+            match = self.lcs(topicname, q)
+
+            if match:
+                match = [x for x in match.split() if len(x) > 2]  # list of words of the match that are > 2 characters
+                if match and len(max(match, key=len)) >= 6:  # if there is a word of at least 6 characters
+                    match = ' '.join(match)
+                    for keyword in botconfig.redd_data['KEYWORDS']:
+                        if self.lcs(keyword.lower(), match.lower()) in botconfig.redd_data['KEYWORDS']:
+                            self.quotes_matched[keyword + "-KEYWORD{:.>5}".format(quotes.index(quote))] = quote
+                            self.keyword_matched = True
+                    if not self.keyword_matched:
+                        self.quotes_matched[match + "{:.>5}".format(quotes.index(quote))] = quote
+
+        if self.quotes_matched:
+            keys = list(self.quotes_matched.keys())
+
+            if self.keyword_matched:
+                keyword_matches_keys = [key for key in keys if '-KEYWORD' in key]
+                log_this(keyword_matches_keys)
+                quote_to_return = self.quotes_matched[choice(keyword_matches_keys)]
+            else:
+                longest_keys = [key for key in keys if len(key) >= len(max(keys, key=len)) - 1]  # all longest
+                log_this(longest_keys)
+                quote_to_return = self.quotes_matched[choice(longest_keys)]
+
+        else:
+            quote_to_return = choice(quotes)
+        return ''.join(('^', quote_to_return.replace(" ", " ^")))
+
+
 class WatchedTreads:
     watched_threads_list = []
 
@@ -255,72 +319,10 @@ class MatchedSubmissions:
     def purge_list():
         MatchedSubmissions.matching_results = []
 
-    @staticmethod
-    def _find_good_quote(quotes, topicname):
-
-        quotes_matched = {}
-
-        def remove_punctuation(quote):
-            punctuation = "!\"#$%&'()*+,-.:;<=>?@[\\]^_`{|}~"
-            punct_clear = ""
-            for letter in quote:
-                if letter not in punctuation:
-                    punct_clear += letter
-            #return punct_clear.split()
-            return punct_clear
-
-        def longest_common_substring(s1, s2):
-            m = [[0] * (len(s2) + 1) for i in range(len(s1) + 1)]
-            longest, x_longest = 0, 0
-            for x in range(1, len(s1) + 1):
-                for y in range(1, len(s2) + 1):
-                    if s1[x - 1] == s2[y - 1]:
-                        m[x][y] = m[x - 1][y - 1] + 1
-                        if m[x][y] > longest:
-                            longest = m[x][y]
-                            x_longest = x
-                    else:
-                        m[x][y] = 0
-            return s1[x_longest - longest: x_longest]
-
-        topicname = remove_punctuation(topicname.lower())
-
-        keyword_matched = False
-
-        for quote in quotes:
-            q = remove_punctuation(quote.lower())
-            match = longest_common_substring(topicname, q)
-
-            if match:
-                match = [x for x in match.split() if len(x) > 2]  # list of words of the match that are > 2 characters
-                if match and len(max(match, key=len)) >= 6:  # if there is a word of at least 6 characters
-                    match = ' '.join(match)
-                    for keyword in botconfig.redd_data['KEYWORDS']:
-                        if longest_common_substring(keyword.lower(), match.lower()) in botconfig.redd_data['KEYWORDS']:
-                            quotes_matched[keyword + "-KEYWORD{:.>5}".format(quotes.index(quote))] = quote
-                            keyword_matched = True
-                    if not keyword_matched:
-                        quotes_matched[match + "{:.>5}".format(quotes.index(quote))] = quote
-
-        if quotes_matched:
-            keys = list(quotes_matched.keys())
-
-            if keyword_matched:
-                keyword_matches_keys = [key for key in keys if '-KEYWORD' in key]
-                log_this(keyword_matches_keys)
-                quote_to_return = quotes_matched[choice(keyword_matches_keys)]
-            else:
-                longest_keys = [key for key in keys if len(key) >= len(max(keys, key=len)) - 1]  # all longest
-                log_this(longest_keys)
-                quote_to_return = quotes_matched[choice(longest_keys)]
-
-        else:
-            quote_to_return = choice(quotes)
-        return ''.join(('^', quote_to_return.replace(" ", " ^")))
-
     def _brigade_message(self):
         if self.is_srs:
-            quote = self._find_good_quote(self.args['keyword_lists']['quotes'], self.args['dsubmission'].title)
+            quote = QuoteBank()
+            quote = quote.get_quote(self.args['keyword_lists']['quotes'], self.args['dsubmission'].title)
             submissionlink = make_np(self.args['dsubmission'].permalink)
             brigade_subreddit_link = '*[/r/{0}]({1})*'.format(self.args['dsubmission'].subreddit, submissionlink)
 
