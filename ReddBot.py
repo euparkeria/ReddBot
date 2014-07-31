@@ -209,7 +209,7 @@ class WatchedTreads:
 
         try:
             user = socmedia.reddit_session.get_redditor(author)
-            for usercomment in user.get_comments(limit=user_comments_limit):
+            for usercomment in user.get_overview(limit=user_comments_limit):
                 if str(usercomment.subreddit) == in_subreddit:
                     user_srs_karma_balance += usercomment.score
         except:
