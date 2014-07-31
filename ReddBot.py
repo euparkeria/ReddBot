@@ -4,8 +4,14 @@ import json
 import os
 import pickle
 import re
+import sqlite3
 from random import choice
 from twython import Twython
+from sqlalchemy import create_engine
+from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy import Column, Integer, String
+from sqlalchemy.orm import sessionmaker
+
 
 
 watched_subreddit = "+".join(['all'])
@@ -18,6 +24,22 @@ DEBUG_LEVEL = 1
 CACHEFILE = 'reddbot.cache'
 AUTHFILE = 'ReddAUTH.json'
 DATAFILE = 'ReddDATA.json'
+
+engine = create_engine('sqlite:///ReddDatabase.db')
+Base = declarative_base()
+DBSession = sessionmaker(bind=engine)
+session = DBSession()
+
+
+class SrsUser(Base):
+    __tablename__ = 'SrsUsers'
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    username = Column(String, unique=True)
+    subreddit = Column(String)
+    reddit_id = Column(String, unique=True)
+    last_check_date = Column(String)
+    SRS_karma_balance = Column(Integer)
+    invasion_number = Column(Integer)
 
 
 class SocialMedia:
@@ -167,7 +189,7 @@ class WatchedTreads:
         self.already_processed_users = []
         self.bot_reply_object_id = bot_reply_object_id
         self.bot_reply_body = bot_reply_body
-        self.keep_alive = 28800  # time to watch a thread in seconds
+        self.keep_alive = 43200  # time to watch a thread in seconds
 
         WatchedTreads.watched_threads_list.append(self)
         self.savecache()
@@ -182,8 +204,7 @@ class WatchedTreads:
             debug('ERROR: Cant write cache file')
 
     @staticmethod
-    def get_user_karma_balance(author, in_subreddit):
-        user_comments_limit = 200
+    def get_user_karma_balance(author, in_subreddit, user_comments_limit=200):
         user_srs_karma_balance = 0
 
         try:
@@ -222,7 +243,7 @@ class WatchedTreads:
     def update():
         debug('Currently Watching {} threads.'.format(len(WatchedTreads.watched_threads_list)))
         split_mark = '\n\n-----\n'
-        karma_upper_limit = 5  # if poster has more than that amount of karma in the srs subreddit he is added
+        karma_upper_limit = 3  # if poster has more than that amount of karma in the srs subreddit he is added
 
         for thread in WatchedTreads.watched_threads_list:
             srs_users = []
@@ -236,10 +257,19 @@ class WatchedTreads:
 
                     if user_srs_karma_balance >= karma_upper_limit:
                         srs_users.append(author)
+                        users_query = session.query(SrsUser).filter_by(username=author)
+                        if not users_query.count():
+                            stupiduser = SrsUser(username=author,
+                                                 subreddit=thread.srs_subreddit,
+                                                 last_check_date=time.time(),
+                                                 SRS_karma_balance=user_srs_karma_balance)
+                            session.add(stupiduser)
+
+
                         debug('MATCH', end=" ")
                     debug('.')
                     thread.already_processed_users.append(author)
-
+            session.commit()
             if srs_users:
                 splitted_comment = thread.bot_reply_body.split(split_mark, 1)
                 srs_users_lines = ''.join(['\n\n* [/u/' + user + '](http://np.reddit.com/u/' + user + ')'
@@ -326,11 +356,11 @@ class MatchedSubmissions:
             submissionlink = make_np(self.args['dsubmission'].permalink)
             brigade_subreddit_link = '*[/r/{0}]({1})*'.format(self.args['dsubmission'].subreddit, submissionlink)
 
-            self.msg_for_reply = "#**NOTICE**:\nThis thread is the target of a possible downvote brigade from " \
+            self.msg_for_reply = "#**NOTICE**:\nThis thread is the target of a *possible* downvote brigade from " \
                                  "{2}^submission ^linked\n\n" \
                 "**Submission Title:**\n\n* *{1}*\n\n**Members of {2}" \
                 " involved in this thread:**" \
-                "^list ^updated ^every ^5 ^minutes ^for ^8 ^hours\n\n \n\n-----\n ^★ *{0}* ^★\n\n " \
+                "^list ^updated ^every ^5 ^minutes ^for ^12 ^hours\n\n \n\n-----\n ^★ *{0}* ^★\n\n " \
                 "[^|bot ^twitter ^feed|](https://twitter.com/bot_redd)"\
                 .format(quote,
                 self.args['dsubmission'].title,
