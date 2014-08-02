@@ -526,7 +526,7 @@ class ReddBot:
 
     @staticmethod
     def commenter(obj, msg):
-        if len(obj.comments) > 1:
+        if len(obj.url.split('/')) == 6:
             debug('ADD to ID:{0}'.format(obj.comments[0].id))
             return obj.add_comment(msg)
         else:
