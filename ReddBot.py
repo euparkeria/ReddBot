@@ -525,11 +525,13 @@ class ReddBot:
                 MatchedSubmissions.purge_list()
 
     @staticmethod
-    def commenter(obj, msg):
-        if len(obj.url.split('/')) == 6:
-            debug('ADD to ID:{0}'.format(obj.comments[0].id))
+    def commenter(obj, msg, result_url):
+        """hacky"""
+        result_url = [x for x in result_url.split('/') if len(x)]
+        if len(result_url) == 7:
+            debug('ADD to ID:{0}'.format(obj.id))
             return obj.add_comment(msg)
-        else:
+        elif len(result_url) == 8:
             debug('REPLY to ID:{0}'.format(obj.comments[0].id))
             return obj.comments[0].reply(msg)
 
@@ -544,7 +546,7 @@ class ReddBot:
                 debug(result.url)
                 if targeted_submission:
                     try:
-                        reply = self.commenter(obj=targeted_submission, msg=result.msg_for_reply)
+                        reply = self.commenter(obj=targeted_submission, msg=result.msg_for_reply, result_url=result.url)
                         WatchedTreads(thread_url=result.url,
                                       srs_subreddit=str(result.args['dsubmission'].subreddit),
                                       srs_author=str(result.args['dsubmission'].author),
