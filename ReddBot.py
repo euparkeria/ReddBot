@@ -4,15 +4,12 @@ import json
 import os
 import pickle
 import re
-import sqlite3
 from random import choice
 from twython import Twython
 from sqlalchemy import create_engine
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy import Column, Integer, String
 from sqlalchemy.orm import sessionmaker
-
-
 
 watched_subreddit = "+".join(['all'])
 results_limit = 800
@@ -28,7 +25,6 @@ DATAFILE = 'ReddDATA.json'
 engine = create_engine('sqlite:///ReddDatabase.db')
 Base = declarative_base()
 DBSession = sessionmaker(bind=engine)
-
 
 
 class SrsUser(Base):
