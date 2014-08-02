@@ -240,13 +240,14 @@ class WatchedTreads:
         session = DBSession()
 
         users_query = session.query(SrsUser).filter_by(username=username)
-        if users_query.count() is False:
+        if not users_query.count():
             stupiduser = SrsUser(username=username,
                                  subreddit=subreddit,
                                  last_check_date=time.time(),
                                  SRS_karma_balance=srs_karma)
             session.add(stupiduser)
             session.commit()
+            debug("{} Added to database!".format(username))
 
     @staticmethod
     def update():
