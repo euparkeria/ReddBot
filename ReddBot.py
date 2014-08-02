@@ -28,7 +28,7 @@ DATAFILE = 'ReddDATA.json'
 engine = create_engine('sqlite:///ReddDatabase.db')
 Base = declarative_base()
 DBSession = sessionmaker(bind=engine)
-session = DBSession()
+
 
 
 class SrsUser(Base):
@@ -240,49 +240,66 @@ class WatchedTreads:
             debug('ERROR: Cant edit comment')
 
     @staticmethod
+    def add_user_to_database(username, subreddit, srs_karma):
+        session = DBSession()
+
+        users_query = session.query(SrsUser).filter_by(username=username)
+        if users_query.count() is False:
+            stupiduser = SrsUser(username=username,
+                                 subreddit=subreddit,
+                                 last_check_date=time.time(),
+                                 SRS_karma_balance=srs_karma)
+            session.add(stupiduser)
+            session.commit()
+
+    @staticmethod
     def update():
         debug('Currently Watching {} threads.'.format(len(WatchedTreads.watched_threads_list)))
-        split_mark = '\n\n-----\n'
+
         karma_upper_limit = 3  # if poster has more than that amount of karma in the srs subreddit he is added
 
         for thread in WatchedTreads.watched_threads_list:
             srs_users = []
             debug('Now processing: {}'.format(thread.thread_url))
+
             for author in WatchedTreads.get_authors_in_thread(thread=thread.thread_url):
                 if author not in thread.already_processed_users:
                     debug('--Checking user: {}'.format(author), end=" ")
                     user_srs_karma_balance = WatchedTreads.get_user_karma_balance(author=author,
                                                                                   in_subreddit=thread.srs_subreddit)
                     debug(',/r/{0} karma score:{1} '.format(thread.srs_subreddit, user_srs_karma_balance), end=" ")
-
                     if user_srs_karma_balance >= karma_upper_limit:
                         srs_users.append(author)
-                        users_query = session.query(SrsUser).filter_by(username=author)
-                        if not users_query.count():
-                            stupiduser = SrsUser(username=author,
-                                                 subreddit=thread.srs_subreddit,
-                                                 last_check_date=time.time(),
-                                                 SRS_karma_balance=user_srs_karma_balance)
-                            session.add(stupiduser)
-
-
+                        WatchedTreads.add_user_to_database(username=author,
+                                                           subreddit=thread.srs_subreddit,
+                                                           srs_karma=user_srs_karma_balance)
                         debug('MATCH', end=" ")
                     debug('.')
                     thread.already_processed_users.append(author)
-            session.commit()
-            if srs_users:
-                splitted_comment = thread.bot_reply_body.split(split_mark, 1)
-                srs_users_lines = ''.join(['\n\n* [/u/' + user + '](http://np.reddit.com/u/' + user + ')'
-                                           for user in srs_users])
-                thread.bot_reply_body = splitted_comment[0] + srs_users_lines + split_mark + splitted_comment[1]
-                WatchedTreads.edit_comment(comment_id=thread.bot_reply_object_id, comment_body=thread.bot_reply_body)
 
+            if srs_users:
+                WatchedTreads.append_lines_to_comment(thread=thread, srs_users=srs_users)
+
+            WatchedTreads.check_if_expired(thread)
+
+        WatchedTreads.savecache()
+
+    @staticmethod
+    def append_lines_to_comment(thread, srs_users):
+        split_mark = '\n\n-----\n'
+        splitted_comment = thread.bot_reply_body.split(split_mark, 1)
+        srs_users_lines = ''.join(['\n\n* [/u/' + user + '](http://np.reddit.com/u/' + user + ')'for user in srs_users])
+        thread.bot_reply_body = splitted_comment[0] + srs_users_lines + split_mark + splitted_comment[1]
+        WatchedTreads.edit_comment(comment_id=thread.bot_reply_object_id, comment_body=thread.bot_reply_body)
+
+
+    @staticmethod
+    def check_if_expired(thread):
             time_watched = time.time() - thread.start_watch_time
             debug('--Watched for {} hours'.format(time_watched/60/60))
             if time_watched > thread.keep_alive:  # if older than 8 hours
                 WatchedTreads.watched_threads_list.remove(thread)
                 debug('--Watched Thread Removed!')
-        WatchedTreads.savecache()
 
 
 class MatchedSubmissions:
