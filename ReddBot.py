@@ -28,7 +28,8 @@ DBSession = sessionmaker(bind=engine)
 
 
 class Variables:
-    reddit_username = ""
+    def __init__(self):
+        self.reddit_username = ""
 
 
 class SrsUser(Base):
@@ -51,19 +52,17 @@ class SocialMedia:
     def connect_to_reddit():
         try:
             r = praw.Reddit(user_agent=bot_agent_name, api_request_delay=1)
-            r.login(botconfig.bot_auth_info['REDDIT_BOT_USERNAME'][0],
-                    botconfig.bot_auth_info['REDDIT_BOT_PASSWORD'])
-            Variables.reddit_username = botconfig.bot_auth_info['REDDIT_BOT_USERNAME'][0]
-            debug('Logged in as {0}'.format(Variables.reddit_username))
+            r.login(botconfig.bot_auth_info['REDDIT_BOT_USERNAME'][0], botconfig.bot_auth_info['REDDIT_BOT_PASSWORD'])
+            debug('Logged in as {0}'.format(globalvars.reddit_username))
         except:
             debug('ERROR: Cant login to Reddit.com')
         return r
 
     @staticmethod
-    def get_username(exclude=Variables.reddit_username):
-        Variables.reddit_username = choice([x for x in botconfig.bot_auth_info['REDDIT_BOT_USERNAME']
+    def get_username(exclude=globalvars.reddit_username):
+        globalvars.reddit_username = choice([x for x in botconfig.bot_auth_info['REDDIT_BOT_USERNAME']
                                             if x is not exclude])
-        return Variables.reddit_username
+        return globalvars.reddit_username
 
     @staticmethod
     def connect_to_twitter():
@@ -197,6 +196,7 @@ class WatchedTreads:
         self.already_processed_users = []
         self.bot_reply_object_id = bot_reply_object_id
         self.bot_reply_body = bot_reply_body
+        self.poster_username = globalvars.reddit_username
         self.keep_alive = 43200  # time to watch a thread in seconds
 
         WatchedTreads.watched_threads_list.append(self)
@@ -239,7 +239,9 @@ class WatchedTreads:
         return authors_list
 
     @staticmethod
-    def edit_comment(comment_id, comment_body):
+    def edit_comment(comment_id, comment_body, poster_username):
+        if globalvars.reddit_username is not poster_username:
+            login(poster_username)
         try:
             comment = socmedia.reddit_session.get_info(thing_id=comment_id)
             comment.edit(comment_body)
@@ -299,7 +301,8 @@ class WatchedTreads:
         splitted_comment = thread.bot_reply_body.split(split_mark, 1)
         srs_users_lines = ''.join(['\n\n* [/u/' + user + '](http://np.reddit.com/u/' + user + ')'for user in srs_users])
         thread.bot_reply_body = splitted_comment[0] + srs_users_lines + split_mark + splitted_comment[1]
-        WatchedTreads.edit_comment(comment_id=thread.bot_reply_object_id, comment_body=thread.bot_reply_body)
+        WatchedTreads.edit_comment(comment_id=thread.bot_reply_object_id, comment_body=thread.bot_reply_body,
+                                   poster_username=thread.poster_username)
 
 
     @staticmethod
@@ -554,9 +557,8 @@ class ReddBot:
                     debug('NOTICE REPLIED to ID:{0}'.format(obj.comments[0].id))
 
             except:
-                log_this('{1} is BANNED in:{0}, trying to relog'.format(obj.subreddit, Variables.reddit_username))
-                socmedia.reddit_session.login(SocialMedia.get_username(),
-                                              botconfig.bot_auth_info['REDDIT_BOT_PASSWORD'])
+                log_this('{1} is BANNED in:{0}, trying to relog'.format(obj.subreddit, globalvars.reddit_username))
+
         if return_obj:
             return return_obj
 
@@ -615,12 +617,16 @@ def debug(debugtext, level=DEBUG_LEVEL, end='\n'):
         print('* {}'.format(debugtext), end=end)
 
 
+def login(username=SocialMedia.get_username()):
+    socmedia.reddit_session.login(username, botconfig.bot_auth_info['REDDIT_BOT_PASSWORD'])
+    globalvars.reddit_username = username
+
+
 
 start_time = time.time()
-#globalvars = Variables()
+globalvars = Variables()
 botconfig = ConfigFiles()
 socmedia = SocialMedia()
-
 bot1 = ReddBot()
 
 
