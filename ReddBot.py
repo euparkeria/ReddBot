@@ -27,6 +27,10 @@ Base = declarative_base()
 DBSession = sessionmaker(bind=engine)
 
 
+class Variables:
+    reddit_username = ""
+
+
 class SrsUser(Base):
     __tablename__ = 'SrsUsers'
     id = Column(Integer, primary_key=True, autoincrement=True)
@@ -47,11 +51,19 @@ class SocialMedia:
     def connect_to_reddit():
         try:
             r = praw.Reddit(user_agent=bot_agent_name, api_request_delay=1)
-            r.login(botconfig.bot_auth_info['REDDIT_BOT_USERNAME'], botconfig.bot_auth_info['REDDIT_BOT_PASSWORD'])
-            debug('Logged in as {0}'.format(botconfig.bot_auth_info['REDDIT_BOT_USERNAME']))
+            r.login(botconfig.bot_auth_info['REDDIT_BOT_USERNAME'][0],
+                    botconfig.bot_auth_info['REDDIT_BOT_PASSWORD'])
+            Variables.reddit_username = botconfig.bot_auth_info['REDDIT_BOT_USERNAME'][0]
+            debug('Logged in as {0}'.format(Variables.reddit_username))
         except:
             debug('ERROR: Cant login to Reddit.com')
         return r
+
+    @staticmethod
+    def get_username(exclude=Variables.reddit_username):
+        Variables.reddit_username = choice([x for x in botconfig.bot_auth_info['REDDIT_BOT_USERNAME']
+                                            if x is not exclude])
+        return Variables.reddit_username
 
     @staticmethod
     def connect_to_twitter():
@@ -529,12 +541,24 @@ class ReddBot:
     def commenter(obj, msg, result_url):
         """hacky"""
         result_url = [x for x in result_url.split('/') if len(x)]
-        if len(result_url) == 7:
-            debug('ADD to ID:{0}'.format(obj.id))
-            return obj.add_comment(msg)
-        elif len(result_url) == 8:
-            debug('REPLY to ID:{0}'.format(obj.comments[0].id))
-            return obj.comments[0].reply(msg)
+        return_obj = None
+        retry_attemts = 3
+        for retry in range(retry_attemts):
+            try:
+
+                if len(result_url) == 7:
+                    return_obj = obj.add_comment(msg)
+                    debug('NOTICE ADDED to ID:{0}'.format(obj.id))
+                elif len(result_url) == 8:
+                    return_obj = obj.comments[0].reply(msg)
+                    debug('NOTICE REPLIED to ID:{0}'.format(obj.comments[0].id))
+
+            except:
+                log_this('{1} is BANNED in:{0}, trying to relog'.format(obj.subreddit, Variables.reddit_username))
+                socmedia.reddit_session.login(SocialMedia.get_username(),
+                                              botconfig.bot_auth_info['REDDIT_BOT_PASSWORD'])
+        if return_obj:
+            return return_obj
 
     def dispatch_nitifications(self, results_list):
         for result in results_list:
@@ -546,17 +570,12 @@ class ReddBot:
                     targeted_submission = None
                 debug(result.url)
                 if targeted_submission:
-                    try:
-                        reply = self.commenter(obj=targeted_submission, msg=result.msg_for_reply, result_url=result.url)
-                        WatchedTreads(thread_url=result.url,
-                                      srs_subreddit=str(result.args['dsubmission'].subreddit),
-                                      srs_author=str(result.args['dsubmission'].author),
-                                      bot_reply_object_id=reply.name,
-                                      bot_reply_body=reply.body)
-
-                        debug('AntiBrigadeBot NOTICE sent')
-                    except:
-                        log_this('Bot is BANNED in:{}, cant reply ):'.format(targeted_submission.subreddit))
+                    reply = self.commenter(obj=targeted_submission, msg=result.msg_for_reply, result_url=result.url)
+                    WatchedTreads(thread_url=result.url,
+                                  srs_subreddit=str(result.args['dsubmission'].subreddit),
+                                  srs_author=str(result.args['dsubmission'].author),
+                                  bot_reply_object_id=reply.name,
+                                  bot_reply_body=reply.body)
 
             if result.msg_for_tweet:
                 tweet_this(result.msg_for_tweet)
@@ -596,8 +615,12 @@ def debug(debugtext, level=DEBUG_LEVEL, end='\n'):
         print('* {}'.format(debugtext), end=end)
 
 
+
 start_time = time.time()
+#globalvars = Variables()
 botconfig = ConfigFiles()
 socmedia = SocialMedia()
 
 bot1 = ReddBot()
+
+
