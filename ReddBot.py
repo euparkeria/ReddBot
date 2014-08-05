@@ -61,6 +61,7 @@ class SocialMedia:
             socmedia.reddit_session.login(username, botconfig.bot_auth_info['REDDIT_BOT_PASSWORD'])
             globalvars.reddit_username = username
             debug('Logged in as {0}'.format(globalvars.reddit_username))
+            time.sleep(3)
         except:
             debug('ERROR: Cant login to Reddit.com')
 
@@ -255,7 +256,6 @@ class WatchedTreads:
             comment = socmedia.reddit_session.get_info(thing_id=comment_id)
             comment.edit(comment_body)
             debug('Comment : {} edited.'.format(comment_id))
-            time.sleep(5)
             socmedia.login(prev_username)
         except:
             debug('ERROR: Cant edit comment')
@@ -264,8 +264,7 @@ class WatchedTreads:
     def add_user_to_database(username, subreddit, srs_karma):
         session = DBSession()
 
-        users_query = session.query(SrsUser).filter_by(username=username)
-        if not users_query.count():
+        if not WatchedTreads.check_if_already_in_db(username):
             stupiduser = SrsUser(username=username,
                                  subreddit=subreddit,
                                  last_check_date=time.time(),
@@ -273,6 +272,15 @@ class WatchedTreads:
             session.add(stupiduser)
             session.commit()
             debug("{} Added to database!".format(username))
+
+    @staticmethod
+    def check_if_already_in_db(username):
+        session = DBSession()
+        users_query = session.query(SrsUser).filter_by(username=username)
+        if users_query.count():
+            return True
+        else:
+            return False
 
     @staticmethod
     def update():
@@ -314,7 +322,6 @@ class WatchedTreads:
         thread.bot_reply_body = splitted_comment[0] + srs_users_lines + split_mark + splitted_comment[1]
         WatchedTreads.edit_comment(comment_id=thread.bot_reply_object_id, comment_body=thread.bot_reply_body,
                                    poster_username=thread.poster_username)
-
 
     @staticmethod
     def check_if_expired(thread):
@@ -572,7 +579,7 @@ class ReddBot:
             except:
                 log_this('{1} is BANNED in:{0}, trying to relog'.format(obj.subreddit, globalvars.reddit_username))
                 socmedia.login()
-                time.sleep(3)
+
 
         if globalvars.reddit_username is not prev_username:
             socmedia.login(prev_username)
