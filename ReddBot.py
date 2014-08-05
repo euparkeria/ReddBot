@@ -581,8 +581,7 @@ class ReddBot:
                 log_this('{1} is BANNED in:{0}, trying to relog'.format(obj.subreddit, globalvars.reddit_username))
                 socmedia.login()
 
-
-        if globalvars.reddit_username is not prev_username:
+        if globalvars.reddit_username != prev_username:
             socmedia.login(prev_username)
         return return_obj
 
