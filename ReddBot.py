@@ -249,14 +249,15 @@ class WatchedTreads:
     @staticmethod
     def edit_comment(comment_id, comment_body, poster_username):
         prev_username = None
-        if globalvars.reddit_username is not poster_username:
+        if globalvars.reddit_username != poster_username:
             prev_username = globalvars.reddit_username
             socmedia.login(poster_username)
         try:
             comment = socmedia.reddit_session.get_info(thing_id=comment_id)
             comment.edit(comment_body)
             debug('Comment : {} edited.'.format(comment_id))
-            socmedia.login(prev_username)
+            if prev_username:
+                socmedia.login(prev_username)
         except:
             debug('ERROR: Cant edit comment')
 
