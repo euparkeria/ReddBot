@@ -12,7 +12,7 @@ from sqlalchemy import Column, Integer, String
 from sqlalchemy.orm import sessionmaker
 
 watched_subreddit = "+".join(['all'])
-results_limit = 800
+results_limit = 100
 results_limit_comm = 900
 bot_agent_name = 'antibrigadebot 2.0 /u/antibrigadebot2'
 loop_timer = 60
@@ -50,14 +50,19 @@ class SocialMedia:
 
     @staticmethod
     def connect_to_reddit():
+        r = praw.Reddit(user_agent=bot_agent_name, api_request_delay=1)
+        return r
+
+    @staticmethod
+    def login(username=''):
         try:
-            r = praw.Reddit(user_agent=bot_agent_name, api_request_delay=1)
-            r.login(botconfig.bot_auth_info['REDDIT_BOT_USERNAME'][0], botconfig.bot_auth_info['REDDIT_BOT_PASSWORD'] )
-            globalvars.reddit_username = botconfig.bot_auth_info['REDDIT_BOT_USERNAME'][0]
+            if not username:
+                username = SocialMedia.get_username()
+            socmedia.reddit_session.login(username, botconfig.bot_auth_info['REDDIT_BOT_PASSWORD'])
+            globalvars.reddit_username = username
             debug('Logged in as {0}'.format(globalvars.reddit_username))
         except:
             debug('ERROR: Cant login to Reddit.com')
-        return r
 
     @staticmethod
     def get_username(exclude=''):
@@ -77,8 +82,6 @@ class SocialMedia:
         return t
 
 
-
-
 class ConfigFiles:
     def __init__(self):
         self.data_modified_time = 0
@@ -88,7 +91,6 @@ class ConfigFiles:
 
         self.redd_data = None
         self.bot_auth_info = None
-
         self.check_for_updated_config()
 
     def check_for_updated_config(self):
@@ -245,12 +247,16 @@ class WatchedTreads:
 
     @staticmethod
     def edit_comment(comment_id, comment_body, poster_username):
+        prev_username = None
         if globalvars.reddit_username is not poster_username:
-            login(poster_username)
+            prev_username = globalvars.reddit_username
+            socmedia.login(poster_username)
         try:
             comment = socmedia.reddit_session.get_info(thing_id=comment_id)
             comment.edit(comment_body)
             debug('Comment : {} edited.'.format(comment_id))
+            time.sleep(5)
+            socmedia.login(prev_username)
         except:
             debug('ERROR: Cant edit comment')
 
@@ -481,10 +487,10 @@ class ReddBot:
             self.permcounters[loop] += self.cont_num[loop]
 
         debug('{0}th sec. Sub so far:{1},THIS run:{2}.'
-                   'Comments so far:{3},THIS run:{4}'
-                   .format(int((time.time() - start_time)), self.permcounters['submissions'],
-                           self.cont_num['submissions'], self.permcounters['comments'],
-                           self.cont_num['comments']))
+              'Comments so far:{3},THIS run:{4}'
+              .format(int((time.time() - start_time)), self.permcounters['submissions'],
+                      self.cont_num['submissions'], self.permcounters['comments'],
+                      self.cont_num['comments']))
 
         self.first_run = False
 
@@ -551,9 +557,10 @@ class ReddBot:
         result_url = [x for x in result_url.split('/') if len(x)]
         return_obj = None
         retry_attemts = 3
+        prev_username = globalvars.reddit_username
+
         for retry in range(retry_attemts):
             try:
-
                 if len(result_url) == 7:
                     return_obj = obj.add_comment(msg)
                     debug('NOTICE ADDED to ID:{0}'.format(obj.id))
@@ -562,13 +569,14 @@ class ReddBot:
                     return_obj = obj.comments[0].reply(msg)
                     debug('NOTICE REPLIED to ID:{0}'.format(obj.comments[0].id))
                     break
-
             except:
                 log_this('{1} is BANNED in:{0}, trying to relog'.format(obj.subreddit, globalvars.reddit_username))
-                login(SocialMedia.get_username())
+                socmedia.login()
+                time.sleep(3)
 
-        if return_obj:
-            return return_obj
+        if globalvars.reddit_username is not prev_username:
+            socmedia.login(prev_username)
+        return return_obj
 
     def dispatch_nitifications(self, results_list):
         for result in results_list:
@@ -625,19 +633,11 @@ def debug(debugtext, level=DEBUG_LEVEL, end='\n'):
         print('* {}'.format(debugtext), end=end)
 
 
-def login(username):
-    if not username:
-        username = SocialMedia.get_username()
-    socmedia.reddit_session.login(username, botconfig.bot_auth_info['REDDIT_BOT_PASSWORD'])
-    globalvars.reddit_username = username
-    debug('Logged in as {0}'.format(globalvars.reddit_username))
-
-
-
 start_time = time.time()
 globalvars = Variables()
 botconfig = ConfigFiles()
 socmedia = SocialMedia()
+socmedia.login(botconfig.bot_auth_info['REDDIT_BOT_USERNAME'][0])
 bot1 = ReddBot()
 
 
