@@ -52,14 +52,17 @@ class SocialMedia:
     def connect_to_reddit():
         try:
             r = praw.Reddit(user_agent=bot_agent_name, api_request_delay=1)
-            r.login(botconfig.bot_auth_info['REDDIT_BOT_USERNAME'][0], botconfig.bot_auth_info['REDDIT_BOT_PASSWORD'])
+            r.login(botconfig.bot_auth_info['REDDIT_BOT_USERNAME'][0], botconfig.bot_auth_info['REDDIT_BOT_PASSWORD'] )
+            globalvars.reddit_username = botconfig.bot_auth_info['REDDIT_BOT_USERNAME'][0]
             debug('Logged in as {0}'.format(globalvars.reddit_username))
         except:
             debug('ERROR: Cant login to Reddit.com')
         return r
 
     @staticmethod
-    def get_username(exclude=globalvars.reddit_username):
+    def get_username(exclude=''):
+        if not exclude:
+            exclude = globalvars.reddit_username
         globalvars.reddit_username = choice([x for x in botconfig.bot_auth_info['REDDIT_BOT_USERNAME']
                                             if x is not exclude])
         return globalvars.reddit_username
@@ -72,6 +75,8 @@ class SocialMedia:
         except:
             debug('ERROR: Cant authenticate into twitter')
         return t
+
+
 
 
 class ConfigFiles:
@@ -552,12 +557,15 @@ class ReddBot:
                 if len(result_url) == 7:
                     return_obj = obj.add_comment(msg)
                     debug('NOTICE ADDED to ID:{0}'.format(obj.id))
+                    break
                 elif len(result_url) == 8:
                     return_obj = obj.comments[0].reply(msg)
                     debug('NOTICE REPLIED to ID:{0}'.format(obj.comments[0].id))
+                    break
 
             except:
                 log_this('{1} is BANNED in:{0}, trying to relog'.format(obj.subreddit, globalvars.reddit_username))
+                login(SocialMedia.get_username())
 
         if return_obj:
             return return_obj
@@ -617,9 +625,12 @@ def debug(debugtext, level=DEBUG_LEVEL, end='\n'):
         print('* {}'.format(debugtext), end=end)
 
 
-def login(username=SocialMedia.get_username()):
+def login(username):
+    if not username:
+        username = SocialMedia.get_username()
     socmedia.reddit_session.login(username, botconfig.bot_auth_info['REDDIT_BOT_PASSWORD'])
     globalvars.reddit_username = username
+    debug('Logged in as {0}'.format(globalvars.reddit_username))
 
 
 
