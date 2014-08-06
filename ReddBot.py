@@ -196,7 +196,7 @@ class QuoteBank:
 class WatchedTreads:
     watched_threads_list = []
 
-    def __init__(self, thread_url, srs_subreddit, srs_author, bot_reply_object_id, bot_reply_body):
+    def __init__(self, thread_url, srs_subreddit, srs_author, bot_reply_object_id, bot_reply_body, poster_username):
         self.thread_url = thread_url
         self.srs_subreddit = srs_subreddit
         self.srs_author = srs_author
@@ -204,7 +204,7 @@ class WatchedTreads:
         self.already_processed_users = []
         self.bot_reply_object_id = bot_reply_object_id
         self.bot_reply_body = bot_reply_body
-        self.poster_username = globalvars.reddit_username
+        self.poster_username = poster_username
         self.keep_alive = 43200  # time to watch a thread in seconds
 
         WatchedTreads.watched_threads_list.append(self)
@@ -600,7 +600,8 @@ class ReddBot:
                                   srs_subreddit=str(result.args['dsubmission'].subreddit),
                                   srs_author=str(result.args['dsubmission'].author),
                                   bot_reply_object_id=reply.name,
-                                  bot_reply_body=reply.body)
+                                  bot_reply_body=reply.body,
+                                  poster_username=str(reply.author))
 
             if result.msg_for_tweet:
                 tweet_this(result.msg_for_tweet)
