@@ -602,6 +602,7 @@ class ReddBot:
                                   bot_reply_object_id=reply.name,
                                   bot_reply_body=reply.body,
                                   poster_username=str(reply.author))
+                    send_pm_to_owner("New Watch thread added: {}".format(reply.url))
 
             if result.msg_for_tweet:
                 tweet_this(result.msg_for_tweet)
