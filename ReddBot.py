@@ -4,6 +4,7 @@ import json
 import os
 import pickle
 import re
+
 from random import choice
 from twython import Twython
 from sqlalchemy import create_engine
@@ -11,7 +12,7 @@ from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy import Column, Integer, String
 from sqlalchemy.orm import sessionmaker
 
-watched_subreddit = "+".join(['all'])
+watched_subreddit = "+".join(['test123456780'])
 results_limit = 100
 results_limit_comm = 900
 bot_agent_name = 'antibrigadebot 2.0 /u/antibrigadebot2'
@@ -602,7 +603,7 @@ class ReddBot:
                                   bot_reply_object_id=reply.name,
                                   bot_reply_body=reply.body,
                                   poster_username=str(reply.author))
-                    send_pm_to_owner("New Watch thread added: {}".format(reply.url))
+                    #send_pm_to_owner("New Watch thread added by: {0} in: {1}".format(str(reply.author), result.url))
 
             if result.msg_for_tweet:
                 tweet_this(result.msg_for_tweet)
@@ -611,7 +612,7 @@ class ReddBot:
 
 def send_pm_to_owner(pm_text):
     try:
-        socmedia.reddit_session.send_message(botconfig.bot_auth_info['REDDIT_PM_TO'], pm_text)
+        socmedia.reddit_session.user.send_message(botconfig.bot_auth_info['REDDIT_PM_TO'], pm_text)
     except:
         debug('ERROR:Cant send pm')
 
