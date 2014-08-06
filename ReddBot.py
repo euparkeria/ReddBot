@@ -28,9 +28,28 @@ Base = declarative_base()
 DBSession = sessionmaker(bind=engine)
 
 
-class Variables:
+class UsernameBank:
     def __init__(self):
         self.reddit_username = ""
+        self.username_count = len(botconfig.bot_auth_info['REDDIT_BOT_USERNAME'])
+        self.already_tried = []
+        self.defaut_username = botconfig.bot_auth_info['REDDIT_BOT_USERNAME'][0]
+
+    def get_username(self, exclude=''):
+        if not exclude:
+            exclude = self.reddit_username
+
+        new_random_username = choice([x for x in botconfig.bot_auth_info['REDDIT_BOT_USERNAME']
+                                      if x is not exclude and x not in self.already_tried])
+        if new_random_username:
+            self.reddit_username = new_random_username
+            self.already_tried.append(new_random_username)
+            return username_bank.reddit_username
+        else:
+            return self.defaut_username
+
+    def purge_tried_list(self):
+        self.already_tried = []
 
 
 class SrsUser(Base):
@@ -58,21 +77,13 @@ class SocialMedia:
     def login(username=''):
         try:
             if not username:
-                username = SocialMedia.get_username()
+                username = username_bank.get_username()
             socmedia.reddit_session.login(username, botconfig.bot_auth_info['REDDIT_BOT_PASSWORD'])
-            globalvars.reddit_username = username
-            debug('Logged in as {0}'.format(globalvars.reddit_username))
+            username_bank.reddit_username = username
+            debug('Logged in as {0}'.format(username_bank.reddit_username))
             time.sleep(3)
         except:
             debug('ERROR: Cant login to Reddit.com')
-
-    @staticmethod
-    def get_username(exclude=''):
-        if not exclude:
-            exclude = globalvars.reddit_username
-        globalvars.reddit_username = choice([x for x in botconfig.bot_auth_info['REDDIT_BOT_USERNAME']
-                                            if x is not exclude])
-        return globalvars.reddit_username
 
     @staticmethod
     def connect_to_twitter():
@@ -250,8 +261,8 @@ class WatchedTreads:
     @staticmethod
     def edit_comment(comment_id, comment_body, poster_username):
         prev_username = None
-        if globalvars.reddit_username != poster_username:
-            prev_username = globalvars.reddit_username
+        if username_bank.reddit_username != poster_username:
+            prev_username = username_bank.reddit_username
             socmedia.login(poster_username)
         try:
             comment = socmedia.reddit_session.get_info(thing_id=comment_id)
@@ -565,8 +576,8 @@ class ReddBot:
         """hacky"""
         result_url = [x for x in result_url.split('/') if len(x)]
         return_obj = None
-        retry_attemts = 3
-        prev_username = globalvars.reddit_username
+        retry_attemts = username_bank.username_count
+        prev_username = username_bank.reddit_username
 
         for retry in range(retry_attemts):
             try:
@@ -579,11 +590,12 @@ class ReddBot:
                     debug('NOTICE REPLIED to ID:{0}'.format(obj.comments[0].id))
                     break
             except:
-                log_this('{1} is BANNED in:{0}, trying to relog'.format(obj.subreddit, globalvars.reddit_username))
+                log_this('{1} is BANNED in:{0}, trying to relog'.format(obj.subreddit, username_bank.reddit_username))
                 socmedia.login()
 
-        if globalvars.reddit_username != prev_username:
+        if username_bank.reddit_username != prev_username:
             socmedia.login(prev_username)
+        username_bank.purge_tried_list()
         return return_obj
 
     def dispatch_nitifications(self, results_list):
@@ -644,10 +656,10 @@ def debug(debugtext, level=DEBUG_LEVEL, end='\n'):
 
 
 start_time = time.time()
-globalvars = Variables()
 botconfig = ConfigFiles()
+username_bank = UsernameBank()
 socmedia = SocialMedia()
-socmedia.login(botconfig.bot_auth_info['REDDIT_BOT_USERNAME'][0])
+socmedia.login(username_bank.defaut_username)
 bot1 = ReddBot()
 
 
