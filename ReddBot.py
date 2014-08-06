@@ -12,7 +12,7 @@ from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy import Column, Integer, String
 from sqlalchemy.orm import sessionmaker
 
-watched_subreddit = "+".join(['test123456780'])
+watched_subreddit = "+".join(['all'])
 results_limit = 100
 results_limit_comm = 900
 bot_agent_name = 'antibrigadebot 2.0 /u/antibrigadebot2'
