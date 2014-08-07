@@ -30,10 +30,10 @@ DBSession = sessionmaker(bind=engine)
 
 class UsernameBank:
     def __init__(self):
-        self.reddit_username = ""
+        self.reddit_username = ""  # currently logged on with username
         self.username_count = len(botconfig.bot_auth_info['REDDIT_BOT_USERNAME'])
         self.already_tried = []
-        self.defaut_username = botconfig.bot_auth_info['REDDIT_BOT_USERNAME'][0]
+        self.defaut_username = botconfig.bot_auth_info['REDDIT_BOT_USERNAME'][0]  # first username is default
 
     def get_username(self, exclude=''):
         if not exclude:
@@ -42,9 +42,8 @@ class UsernameBank:
         new_random_username = choice([x for x in botconfig.bot_auth_info['REDDIT_BOT_USERNAME']
                                       if x is not exclude and x not in self.already_tried])
         if new_random_username:
-            self.reddit_username = new_random_username
             self.already_tried.append(new_random_username)
-            return username_bank.reddit_username
+            return new_random_username
         else:
             return self.defaut_username
 
@@ -80,10 +79,10 @@ class SocialMedia:
                 username = username_bank.get_username()
             socmedia.reddit_session.login(username, botconfig.bot_auth_info['REDDIT_BOT_PASSWORD'])
             username_bank.reddit_username = username
-            debug('Logged in as {0}'.format(username_bank.reddit_username))
+            debug('Sucessfully logged in as {0}'.format(username_bank.reddit_username))
             time.sleep(3)
         except:
-            debug('ERROR: Cant login to Reddit.com')
+            log_this('ERROR: Cant login to Reddit.com')
 
     @staticmethod
     def connect_to_twitter():
@@ -91,7 +90,7 @@ class SocialMedia:
             t = Twython(botconfig.bot_auth_info['APP_KEY'], botconfig.bot_auth_info['APP_SECRET'],
                         botconfig.bot_auth_info['OAUTH_TOKEN'], botconfig.bot_auth_info['OAUTH_TOKEN_SECRET'])
         except:
-            debug('ERROR: Cant authenticate into twitter')
+            log_this('ERROR: Cant authenticate into twitter')
         return t
 
 
@@ -137,7 +136,7 @@ class ConfigFiles:
                 redd_data['SRSs'] = [x.lower() for x in redd_data['SRSs']]
                 #redd_data['quotes'] = [''.join(('^', x.replace(" ", " ^"))) for x in redd_data['quotes']]
         except:
-            debug("Error reading data file")
+            log_this("Error reading data file")
         return redd_data
 
 
@@ -229,7 +228,7 @@ class WatchedTreads:
             with open(CACHEFILE, 'wb') as fa:
                 pickle.dump(WatchedTreads.watched_threads_list, fa)
         except:
-            debug('ERROR: Cant write cache file')
+            log_this('ERROR: Cant write cache file')
 
     @staticmethod
     def get_user_karma_balance(author, in_subreddit, user_comments_limit=200):
@@ -241,7 +240,7 @@ class WatchedTreads:
                 if str(usercomment.subreddit) == in_subreddit:
                     user_srs_karma_balance += usercomment.score
         except:
-            debug('ERROR: Cant get user SRS karma balance!!')
+            log_this('ERROR: Cant get user SRS karma balance!!')
         return user_srs_karma_balance
 
     @staticmethod
@@ -255,7 +254,7 @@ class WatchedTreads:
                 if author not in botconfig.bot_auth_info['REDDIT_BOT_USERNAME']:
                     authors_list.append(author)
         except:
-            debug('ERROR:couldnt get all authors from thread')
+            log_this('ERROR:couldnt get all authors from thread')
         return authors_list
 
     @staticmethod
@@ -271,7 +270,7 @@ class WatchedTreads:
             if prev_username:
                 socmedia.login(prev_username)
         except:
-            debug('ERROR: Cant edit comment')
+            log_this('ERROR: Cant edit comment')
 
     @staticmethod
     def add_user_to_database(username, subreddit, srs_karma):
@@ -470,11 +469,10 @@ class ReddBot:
         maint_timer = time.time()
         avg_subs_per_sec = self.permcounters['submissions'] / (time.time() - start_time)
         debug('avg_subs_per_sec {}'.format(avg_subs_per_sec))
-        #try:
+
         for function in self._maintenance_functions():
             function()
-        #except:
-            #self.debug('Maintenance Loop Error')
+
         maint_timer = time.time() - maint_timer
         debug('maint_seconds {}'.format(maint_timer))
 
@@ -556,7 +554,7 @@ class ReddBot:
             if new_submissions_list:
                 self.placeholder_id = new_submissions_list[0].id
         except:
-            debug('ERROR:Cannot connect to reddit!!!')
+            log_this('ERROR:Cannot connect to reddit!!!')
         return new_submissions_list
 
     def _contentloop(self, target):
@@ -604,7 +602,7 @@ class ReddBot:
                 try:
                     targeted_submission = socmedia.reddit_session.get_submission(result.url)
                 except:
-                    debug('ERROR: cant get submission by url, Invalid submission url!?')
+                    log_this('ERROR: cant get submission by url, Invalid submission url!?')
                     targeted_submission = None
                 debug(result.url)
                 if targeted_submission:
@@ -626,7 +624,7 @@ def send_pm_to_owner(pm_text):
     try:
         socmedia.reddit_session.user.send_message(botconfig.bot_auth_info['REDDIT_PM_TO'], pm_text)
     except:
-        debug('ERROR:Cant send pm')
+        log_this('ERROR:Cant send pm')
 
 
 def make_np(link):
@@ -636,18 +634,18 @@ def make_np(link):
 def tweet_this(msg):
     if len(msg) > 140:
         msg = msg[:139]
-        debug('MSG exceeding 140 characters!!')
+        log_this('MSG exceeding 140 characters!!')
     try:
         socmedia.twitter_session.update_status(status=msg)
         debug('TWEET SENT!!!')
     except:
-        debug('ERROR: couldnt update twitter status')
+        log_this('ERROR: couldnt update twitter status')
 
 
 def log_this(logtext):
     with open('LOG.txt', 'a') as logfile:
         logfile.write('{0}: {1}\n'.format(time.ctime(), logtext))
-    debug('LOOGGED {}'.format(logtext))
+    debug('Sent to LOG FILE: {}'.format(logtext))
 
 
 def debug(debugtext, level=DEBUG_LEVEL, end='\n'):
