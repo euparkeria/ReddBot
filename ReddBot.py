@@ -38,6 +38,7 @@ class UsernameBank:
     def get_username(self, exclude=''):
         if not exclude:
             exclude = self.reddit_username
+        self.already_tried.append(exclude)
 
         new_random_username = choice([x for x in botconfig.bot_auth_info['REDDIT_BOT_USERNAME']
                                       if x is not exclude and x not in self.already_tried])
