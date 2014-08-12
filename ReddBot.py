@@ -419,9 +419,9 @@ class MatchedSubmissions:
 
             self.msg_for_reply = "#**{3}**:\nThis thread has been targeted by a *possible* downvote brigade from " \
                                  "{0}^submission ^linked\n\n" \
-                "**Their title:**\n\n* *{1}*\n\n**Members of {2}" \
+                "**Their title:**\n\n* *{1}*\n\n**Members of {0}" \
                 " active in this thread:**" \
-                "^list ^updated ^every ^5 ^minutes ^for ^12 ^hours\n\n \n\n-----\n ^★ *{0}* ^★\n\n " \
+                "^updated ^every ^5 ^minutes ^for ^12 ^hours\n\n \n\n-----\n ^★ *{2}* ^★\n\n " \
                 "[^|bot ^twitter ^feed|](https://twitter.com/bot_redd)"\
                 .format(
                 brigade_subreddit_link,
