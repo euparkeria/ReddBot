@@ -415,16 +415,19 @@ class MatchedSubmissions:
             quote = quote.get_quote(self.args['keyword_lists']['quotes'], self.args['dsubmission'].title)
             submissionlink = make_np(self.args['dsubmission'].permalink)
             brigade_subreddit_link = '*[/r/{0}]({1})*'.format(self.args['dsubmission'].subreddit, submissionlink)
+            notification = ['Notice', 'Public Service Announcement', 'Attention']
 
-            self.msg_for_reply = "#**NOTICE**:\nThis thread is the target of a *possible* downvote brigade from " \
-                                 "{2}^submission ^linked\n\n" \
-                "**Submission Title:**\n\n* *{1}*\n\n**Members of {2}" \
-                " involved in this thread:**" \
+            self.msg_for_reply = "#**{3}**:\nThis thread has been targeted by a *possible* downvote brigade from " \
+                                 "{0}^submission ^linked\n\n" \
+                "**Their title:**\n\n* *{1}*\n\n**Members of {2}" \
+                " active in this thread:**" \
                 "^list ^updated ^every ^5 ^minutes ^for ^12 ^hours\n\n \n\n-----\n ^★ *{0}* ^★\n\n " \
                 "[^|bot ^twitter ^feed|](https://twitter.com/bot_redd)"\
-                .format(quote,
+                .format(
+                brigade_subreddit_link,
                 self.args['dsubmission'].title,
-                brigade_subreddit_link)
+                quote,
+                choice(notification))
             return True
         return False
 
