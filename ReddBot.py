@@ -291,6 +291,8 @@ class WatchedTreads:
                 users_query.invasion_number += 1
             else:
                 users_query.invasion_number = 1
+            users_query.last_check_date = time.time()
+            users_query.SRS_karma_balance = srs_karma
             debug("Increased Invasion Number for {0} to {1}!".format(username, users_query.invasion_number + 1))
         session.commit()
 
@@ -554,7 +556,6 @@ class ReddBot:
             return socmedia.reddit_session.get_comments(subreddit, limit=limit)
 
     def _get_new_comments_or_subs(self, target):
-
         results = ReddBot.get_comments_or_subs(placeholder_id=self.placeholder_id, subreddit=watched_subreddit,
                                                limit=self.pulllimit[target], target=target)
 
