@@ -283,8 +283,15 @@ class WatchedTreads:
                                  last_check_date=time.time(),
                                  SRS_karma_balance=srs_karma)
             session.add(stupiduser)
-            session.commit()
+
             debug("{} Added to database!".format(username))
+        else:
+            users_query = session.query(SrsUser).filter_by(username=username, subreddit=subreddit)
+            users_query.invasion_number += 1
+            debug("{} Increased Invasion Number!".format(username))
+        session.commit()
+
+
 
     @staticmethod
     def check_if_already_in_db(username):
