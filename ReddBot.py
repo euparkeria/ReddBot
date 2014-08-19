@@ -286,9 +286,12 @@ class WatchedTreads:
 
             debug("{} Added to database!".format(username))
         else:
-            users_query = session.query(SrsUser).filter_by(username=username, subreddit=subreddit)
-            users_query.invasion_number += 1
-            debug("{} Increased Invasion Number!".format(username))
+            users_query = session.query(SrsUser).filter_by(username=username, subreddit=subreddit).first()
+            if users_query.invasion_number:
+                users_query.invasion_number += 1
+            else:
+                users_query.invasion_number = 1
+            debug("Increased Invasion Number for {0} to {1}!".format(username, users_query.invasion_number + 1))
         session.commit()
 
 
@@ -469,7 +472,7 @@ class ReddBot:
         loop_counter = 0
         while True:
             loop_counter += 1
-            if loop_counter >= secondary_timer / loop_timer:
+            if loop_counter >= secondary_timer / loop_timer or self.first_run:
                 self._maintenance_loop()
                 loop_counter = 0
 
