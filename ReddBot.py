@@ -219,9 +219,13 @@ class WatchedTreads:
         self.poster_username = poster_username
         self.keep_alive = 43200  # time to watch a thread in seconds
 
-        WatchedTreads.watched_threads_list.append(self)
-        self.savecache()
-        debug('new watch object added')
+        already_watched = False
+        for thread in WatchedTreads.watched_threads_list:
+            if thread.url in self.thread_url:
+                already_watched = True
+        if not already_watched:
+            WatchedTreads.watched_threads_list.append(self)
+            self.savecache()
 
     @staticmethod
     def savecache():
@@ -295,8 +299,6 @@ class WatchedTreads:
             users_query.SRS_karma_balance = srs_karma
             debug("Updated database entry on: {0} !".format(username))
         session.commit()
-
-
 
     @staticmethod
     def check_if_already_in_db(username):
@@ -621,14 +623,17 @@ class ReddBot:
                     targeted_submission = None
                 debug(result.url)
                 if targeted_submission:
-                    reply = self.commenter(obj=targeted_submission, msg=result.msg_for_reply, result_url=result.url)
-                    WatchedTreads(thread_url=result.url,
-                                  srs_subreddit=str(result.args['dsubmission'].subreddit),
-                                  srs_author=str(result.args['dsubmission'].author),
-                                  bot_reply_object_id=reply.name,
-                                  bot_reply_body=reply.body,
-                                  poster_username=str(reply.author))
-                    #send_pm_to_owner("New Watch thread added by: {0} in: {1}".format(str(reply.author), result.url))
+                    try:
+                        reply = self.commenter(obj=targeted_submission, msg=result.msg_for_reply, result_url=result.url)
+                        WatchedTreads(thread_url=result.url,
+                                      srs_subreddit=str(result.args['dsubmission'].subreddit),
+                                      srs_author=str(result.args['dsubmission'].author),
+                                      bot_reply_object_id=reply.name,
+                                      bot_reply_body=reply.body,
+                                      poster_username=str(reply.author))
+                        #send_pm_to_owner("New Watch thread added by: {0} in: {1}".format(str(reply.author), result.url))
+                    except:
+                        log_this("ERROR: ALL USERS BANNED!")
 
             if result.msg_for_tweet:
                 tweet_this(result.msg_for_tweet)
