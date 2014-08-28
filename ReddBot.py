@@ -226,6 +226,7 @@ class WatchedTreads:
         if not already_watched:
             WatchedTreads.watched_threads_list.append(self)
             self.savecache()
+        debug("THREAD ALREADY WATCHED!!")
 
     @staticmethod
     def savecache():
