@@ -55,7 +55,7 @@ class UsernameBank:
 class SrsUser(Base):
     __tablename__ = 'SrsUsers'
     id = Column(Integer, primary_key=True, autoincrement=True)
-    username = Column(String, unique=True)
+    username = Column(String)
     subreddit = Column(String)
     reddit_id = Column(String, unique=True)
     last_check_date = Column(String)
@@ -277,7 +277,7 @@ class WatchedTreads:
     def add_user_to_database(username, subreddit, srs_karma):
         session = DBSession()
 
-        if not WatchedTreads.check_if_already_in_db(username):
+        if not WatchedTreads.check_if_already_in_db(username, subreddit):
             stupiduser = SrsUser(username=username,
                                  subreddit=subreddit,
                                  last_check_date=time.time(),
@@ -297,9 +297,9 @@ class WatchedTreads:
         session.commit()
 
     @staticmethod
-    def check_if_already_in_db(username):
+    def check_if_already_in_db(username, subreddit):
         session = DBSession()
-        users_query = session.query(SrsUser).filter_by(username=username)
+        users_query = session.query(SrsUser).filter_by(username=username, subreddit=subreddit)
         if users_query.count():
             return True
         else:
