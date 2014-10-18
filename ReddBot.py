@@ -248,8 +248,8 @@ class WatchedTreads:
     def get_authors_in_thread(thread):
         authors_list = []
         submission = socmedia.reddit_session.get_submission(thread)
-        submission.replace_more_comments(limit=4, threshold=1)
         try:
+            submission.replace_more_comments(limit=4, threshold=1)
             for comment in praw.helpers.flatten_tree(submission.comments):
                 author = str(comment.author)
                 if author not in botconfig.bot_auth_info['REDDIT_BOT_USERNAME']:
@@ -425,19 +425,24 @@ class MatchedSubmissions:
             quote = quote.get_quote(self.args['keyword_lists']['quotes'], self.args['dsubmission'].title)
             submissionlink = make_np(self.args['dsubmission'].permalink)
             brigade_subreddit_link = '*[/r/{0}]({1})*'.format(self.args['dsubmission'].subreddit, submissionlink)
-            notification = ['Notice', 'Public Service Announcement', 'Attention']
+            notification = ['Notice',
+                            'Public Service Announcement',
+                            'Attention',
+                            'Advisory',
+                            'Friendly Alert'
+                            ]
 
             self.msg_for_reply = "#**{3}**:\nThis thread has been targeted by a *possible* downvote brigade from " \
                                  "{0}^submission ^linked\n\n" \
                 "**Their title:**\n\n* *{1}*\n\n**Members of {0}" \
                 " active in this thread:**" \
-                "^updated ^every ^5 ^minutes ^for ^12 ^hours\n\n \n\n-----\n ^★ *{2}* ^★\n\n " \
-                "[^|bot ^twitter ^feed|](https://twitter.com/bot_redd)"\
-                .format(
+                "^updated ^every ^5 ^minutes ^for ^12 ^hours\n\n \n\n-----\n ^★ *{2}* ^★\n\n ".format(
                 brigade_subreddit_link,
                 self.args['dsubmission'].title,
                 quote,
-                choice(notification))
+                choice(notification)
+                )
+            #  "[^|bot ^twitter ^feed|](https://twitter.com/bot_redd)"\
             return True
         return False
 
