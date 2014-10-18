@@ -52,6 +52,11 @@ class UsernameBank:
     def purge_tried_list(self):
         self.already_tried = []
 
+    def prev_username_login(self):
+        if self.reddit_username != self.prev_username:
+            socmedia.login(username_bank.prev_username)
+            self.prev_username = ''
+
 
 class SrsUser(Base):
     __tablename__ = 'SrsUsers'
@@ -261,17 +266,14 @@ class WatchedTreads:
 
     @staticmethod
     def edit_comment(comment_id, comment_body, poster_username):
-
+        username_bank.prev_username = username_bank.reddit_username
         if username_bank.reddit_username != poster_username:
-            username_bank.prev_username = username_bank.reddit_username
             socmedia.login(poster_username)
         try:
             comment = socmedia.reddit_session.get_info(thing_id=comment_id)
             comment.edit(comment_body)
             debug('Comment : {} edited.'.format(comment_id))
-            if username_bank.prev_username:
-                socmedia.login(username_bank.prev_username)
-                username_bank.prev_username = ''
+            username_bank.prev_username_login()
         except:
             log_this('ERROR: Cant edit comment')
 
@@ -611,9 +613,7 @@ class ReddBot:
                 log_this('{1} is BANNED in:{0}, trying to relog'.format(obj.subreddit, username_bank.reddit_username))
                 socmedia.login()
 
-        if username_bank.reddit_username != username_bank.prev_username:
-            socmedia.login(username_bank.prev_username)
-            username_bank.prev_username = ''
+        username_bank.prev_username_login()
         username_bank.purge_tried_list()
         return return_obj
 
