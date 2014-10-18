@@ -644,8 +644,8 @@ class ReddBot:
                                               bot_reply_body=reply.body,
                                               poster_username=str(reply.author))
                                 #send_pm_to_owner("New Watch thread added by: {0} in: {1}".format(str(reply.author), result.url))
-                            except:
-                                log_this("ERROR: ALL USERS BANNED IN: {}".format(reply.subreddit))
+                            except AttributeError:
+                                log_this("ERROR: ALL USERS BANNED IN: {}".format(targeted_submission.subreddit))
                         else:
                             debug("THREAD ALREADY WATCHED!")
 
