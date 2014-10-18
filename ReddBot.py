@@ -34,6 +34,7 @@ class UsernameBank:
         self.username_count = len(botconfig.bot_auth_info['REDDIT_BOT_USERNAME'])
         self.already_tried = []
         self.defaut_username = botconfig.bot_auth_info['REDDIT_BOT_USERNAME'][0]  # first username is default
+        self.prev_username = ''  # previous used username
 
     def get_username(self, exclude=''):
         if not exclude:
@@ -260,16 +261,17 @@ class WatchedTreads:
 
     @staticmethod
     def edit_comment(comment_id, comment_body, poster_username):
-        prev_username = None
+
         if username_bank.reddit_username != poster_username:
-            prev_username = username_bank.reddit_username
+            username_bank.prev_username = username_bank.reddit_username
             socmedia.login(poster_username)
         try:
             comment = socmedia.reddit_session.get_info(thing_id=comment_id)
             comment.edit(comment_body)
             debug('Comment : {} edited.'.format(comment_id))
-            if prev_username:
-                socmedia.login(prev_username)
+            if username_bank.prev_username:
+                socmedia.login(username_bank.prev_username)
+                username_bank.prev_username = ''
         except:
             log_this('ERROR: Cant edit comment')
 
@@ -593,7 +595,7 @@ class ReddBot:
         result_url = [x for x in result_url.split('/') if len(x)]
         return_obj = None
         retry_attemts = username_bank.username_count
-        prev_username = username_bank.reddit_username
+        username_bank.prev_username = username_bank.reddit_username
 
         for retry in range(retry_attemts):
             try:
@@ -609,8 +611,9 @@ class ReddBot:
                 log_this('{1} is BANNED in:{0}, trying to relog'.format(obj.subreddit, username_bank.reddit_username))
                 socmedia.login()
 
-        if username_bank.reddit_username != prev_username:
-            socmedia.login(prev_username)
+        if username_bank.reddit_username != username_bank.prev_username:
+            socmedia.login(username_bank.prev_username)
+            username_bank.prev_username = ''
         username_bank.purge_tried_list()
         return return_obj
 
