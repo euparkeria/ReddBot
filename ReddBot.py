@@ -309,9 +309,6 @@ class RedditOperations:
             log_this('ERROR: couldnt update twitter status')
 
 
-
-
-
 class WatchedTreads:
     watched_threads_list = []
 
