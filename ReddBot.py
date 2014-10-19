@@ -7,6 +7,7 @@ import re
 
 from random import choice
 from twython import Twython
+from twython import TwythonError
 from sqlalchemy import create_engine
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy import Column, Integer, String
@@ -84,7 +85,7 @@ class SocialMedia:
         try:
             t = Twython(botconfig.bot_auth_info['APP_KEY'], botconfig.bot_auth_info['APP_SECRET'],
                         botconfig.bot_auth_info['OAUTH_TOKEN'], botconfig.bot_auth_info['OAUTH_TOKEN_SECRET'])
-        except:
+        except TwythonError:
             log_this('ERROR: Cant authenticate into twitter')
         return t
 
@@ -130,7 +131,7 @@ class ConfigFiles:
                 redd_data['KEYWORDS'] = sorted(redd_data['KEYWORDS'], key=len, reverse=True)
                 redd_data['SRSs'] = [x.lower() for x in redd_data['SRSs']]
                 #redd_data['quotes'] = [''.join(('^', x.replace(" ", " ^"))) for x in redd_data['quotes']]
-        except:
+        except IOError:
             log_this("Error reading data file")
         return redd_data
 
@@ -305,7 +306,7 @@ class RedditOperations:
         try:
             self.socmedia.twitter_session.update_status(status=msg)
             debug('TWEET SENT!!!')
-        except:
+        except TwythonError:
             log_this('ERROR: couldnt update twitter status')
 
 
@@ -331,7 +332,7 @@ class WatchedTreads:
         try:
             with open(CACHEFILE, 'wb') as fa:
                 pickle.dump(WatchedTreads.watched_threads_list, fa)
-        except:
+        except IOError:
             log_this('ERROR: Cant write cache file')
 
     @staticmethod
