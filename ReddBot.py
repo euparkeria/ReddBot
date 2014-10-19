@@ -488,23 +488,50 @@ class MatchedSubmissions:
             quote = quote.get_quote(self.args['keyword_lists']['quotes'], self.args['dsubmission'].title)
             submissionlink = reddit_operations.make_np(self.args['dsubmission'].permalink)
             brigade_subreddit_link = '*[/r/{0}]({1})*'.format(self.args['dsubmission'].subreddit, submissionlink)
-            notification = ['Notice',
-                            'Public Service Announcement',
-                            'Attention',
-                            'Advisory',
-                            'Friendly Alert'
+
+            greetings = ['Notice',
+                         'Public Service Announcement',
+                         'Attention',
+                         'Advisory',
+                         'Friendly Alert'
+                         ]
+
+            updated_on = '^updated ^every ^5 ^minutes ^for ^12 ^hours.'
+
+            members_active = ['Members of {0} active in this thread:**{1}'
+                              .format(brigade_subreddit_link, updated_on),
+                              'Redditors from {0} involved in this thread:**{1}'
+                              .format(brigade_subreddit_link, updated_on),
+                              'Subscribers of {0} active in this thread:**{1}'
+                              .format(brigade_subreddit_link, updated_on),
+                              'Brigadiers from {0} active in this thread:**{1}'
+                              .format(brigade_subreddit_link, updated_on)
+                              ]
+            stars = ['★', '☆', '☭', '❤']
+
+            their_title = ['Their title:',
+                           'Their Submission title:',
+                           'Title of their Submission:',
+                           'Brigade Submission title:']
+
+            explanations = ['This thread has been targeted by a *possible* downvote-brigade from {0}'
+                            .format(brigade_subreddit_link),
+                            'This post was just linked from {0} in a possible attempt to downvote-brigade it.'
+                            .format(brigade_subreddit_link),
+                            'A possible downvote brigade attempt detected from {0}'
+                            .format(brigade_subreddit_link),
                             ]
 
-            self.msg_for_reply = "#**{3}**:\nThis thread has been targeted by a *possible* downvote brigade from " \
-                                 "{0}^submission ^linked\n\n" \
-                "**Their title:**\n\n* *{1}*\n\n**Members of {0}" \
-                " active in this thread:**" \
-                "^updated ^every ^5 ^minutes ^for ^12 ^hours\n\n \n\n-----\n ^★ *{2}* ^★\n\n ".format(
-                brigade_subreddit_link,
-                self.args['dsubmission'].title,
-                quote,
-                choice(notification)
-                )
+            lines = ['#**{0}**:\n'.format(choice(greetings)),
+                     '{0}\n\n'.format(choice(explanations)),
+                     '**{0}**\n\n*'.format(choice(their_title)),
+                     '*{0}*\n\n'.format(self.args['dsubmission'].title),
+                     '{0}\n\n'.format(choice(members_active)),
+                     '\n\n-----\n',
+                     '^{1} *{0}* ^{1}\n\n'.format(quote, choice(stars)),
+                     ]
+
+            self.msg_for_reply = ''.join(lines)
             #  "[^|bot ^twitter ^feed|](https://twitter.com/bot_redd)"\
             return True
         return False
