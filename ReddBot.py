@@ -498,16 +498,17 @@ class MatchedSubmissions:
 
             updated_on = '^updated ^every ^5 ^minutes ^for ^12 ^hours.'
 
-            members_active = ['Members of {0} active in this thread:**{1}'
+            members_active = ['Members of {0} active in this thread:{1}'
                               .format(brigade_subreddit_link, updated_on),
-                              'Redditors from {0} involved in this thread:**{1}'
+                              'Redditors from {0} involved in this thread:{1}'
                               .format(brigade_subreddit_link, updated_on),
-                              'Subscribers of {0} active in this thread:**{1}'
+                              'Subscribers of {0} active in this thread:{1}'
                               .format(brigade_subreddit_link, updated_on),
-                              'Brigadiers from {0} active in this thread:**{1}'
+                              'Brigadiers from {0} active in this thread:{1}'
                               .format(brigade_subreddit_link, updated_on)
                               ]
-            stars = ['★', '☆', '☭', '❤']
+
+            stars = ['★', '☭', '❤', '♀']
 
             their_title = ['Their title:',
                            'Their Submission title:',
@@ -524,9 +525,9 @@ class MatchedSubmissions:
 
             lines = ['#**{0}**:\n'.format(choice(greetings)),
                      '{0}\n\n'.format(choice(explanations)),
-                     '**{0}**\n\n*'.format(choice(their_title)),
-                     '*{0}*\n\n'.format(self.args['dsubmission'].title),
-                     '{0}\n\n'.format(choice(members_active)),
+                     '**{0}**\n\n'.format(choice(their_title)),
+                     '* *{0}*\n\n'.format(self.args['dsubmission'].title),
+                     '**{0}**\n\n'.format(choice(members_active)),
                      '\n\n-----\n',
                      '^{1} *{0}* ^{1}\n\n'.format(quote, choice(stars)),
                      ]
