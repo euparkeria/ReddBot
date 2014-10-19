@@ -380,7 +380,7 @@ class WatchedTreads:
                 if author not in thread.already_processed_users:
                     debug('--Checking user: {}'.format(author), end=" ")
                     user_srs_karma_balance = reddit_operations.get_user_karma_balance(author=author,
-                                                                                  in_subreddit=thread.srs_subreddit)
+                                                                                      in_subreddit=thread.srs_subreddit)
                     debug(',/r/{0} karma score:{1} '.format(thread.srs_subreddit, user_srs_karma_balance), end=" ")
                     if user_srs_karma_balance >= karma_upper_limit:
                         srs_users.append(author)
