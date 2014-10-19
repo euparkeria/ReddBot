@@ -427,7 +427,7 @@ class MatchedSubmissions:
         self.url = self._get_clean_url()
 
         self.is_srs = False
-        self.keyword_matched = False
+        self.keyword_matched = ''
 
         self.msg_for_tweet = None
         self.msg_for_reply = None
