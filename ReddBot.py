@@ -54,7 +54,7 @@ class UsernameBank:
 
     def prev_username_login(self):
         if self.reddit_username != self.prev_username:
-            socmedia.login(username_bank.prev_username)
+            reddit_operations.login(username_bank.prev_username)
             self.prev_username = ''
 
 
@@ -78,18 +78,6 @@ class SocialMedia:
     def connect_to_reddit():
         r = praw.Reddit(user_agent=bot_agent_name, api_request_delay=1)
         return r
-
-    @staticmethod
-    def login(username=''):
-        try:
-            if not username:
-                username = username_bank.get_username()
-            socmedia.reddit_session.login(username, botconfig.bot_auth_info['REDDIT_BOT_PASSWORD'])
-            username_bank.reddit_username = username
-            debug('Sucessfully logged in as {0}'.format(username_bank.reddit_username))
-            time.sleep(3)
-        except:
-            log_this('ERROR: Cant login to Reddit.com')
 
     @staticmethod
     def connect_to_twitter():
@@ -130,7 +118,7 @@ class ConfigFiles:
         try:
             with open(CACHEFILE, 'rb') as f:
                 return pickle.load(f)
-        except:
+        except IOError:
             debug('Cache File not Pressent')
             return False
 
@@ -211,6 +199,119 @@ class QuoteBank:
         return ''.join(('^', quote_to_return.replace(" ", " ^")))
 
 
+class RedditOperations:
+
+    def __init__(self):
+        self.socmedia = SocialMedia()
+
+    def login(self, username=''):
+        try:
+            if not username:
+                username = username_bank.get_username()
+            self.socmedia.reddit_session.login(username, botconfig.bot_auth_info['REDDIT_BOT_PASSWORD'])
+            username_bank.reddit_username = username
+            debug('Sucessfully logged in as {0}'.format(username_bank.reddit_username))
+            time.sleep(3)
+        except:
+            log_this('ERROR: Cant login to Reddit.com')
+
+    def get_user_karma_balance(self, author, in_subreddit, user_comments_limit=200):
+        user_srs_karma_balance = 0
+
+        try:
+            user = self.socmedia.reddit_session.get_redditor(author)
+            for usercomment in user.get_overview(limit=user_comments_limit):
+                if str(usercomment.subreddit) == in_subreddit:
+                    user_srs_karma_balance += usercomment.score
+        except:
+            log_this('ERROR: Cant get user SRS karma balance!!')
+        return user_srs_karma_balance
+
+    def get_authors_in_thread(self, thread):
+        authors_list = []
+        submission = self.socmedia.reddit_session.get_submission(thread)
+        try:
+            submission.replace_more_comments(limit=4, threshold=1)
+            for comment in praw.helpers.flatten_tree(submission.comments):
+                author = str(comment.author)
+                if author not in botconfig.bot_auth_info['REDDIT_BOT_USERNAME']:
+                    authors_list.append(author)
+        except:
+            log_this('ERROR:couldnt get all authors from thread')
+        return authors_list
+
+    def edit_comment(self, comment_id, comment_body, poster_username):
+        username_bank.prev_username = username_bank.reddit_username
+        if username_bank.reddit_username != poster_username:
+            self.login(poster_username)
+        try:
+            comment = self.socmedia.reddit_session.get_info(thing_id=comment_id)
+            comment.edit(comment_body)
+            debug('Comment : {} edited.'.format(comment_id))
+            username_bank.prev_username_login()
+        except:
+            log_this('ERROR: Cant edit comment')
+
+    def get_comments_or_subs(self, placeholder_id='', subreddit=watched_subreddit,
+                             limit=results_limit, target='submissions'):
+        if target == 'submissions':
+            return self.socmedia.reddit_session.get_subreddit(subreddit).get_new(limit=limit,
+                                                                                 place_holder=placeholder_id)
+        if target == 'comments':
+            return self.socmedia.reddit_session.get_comments(subreddit, limit=limit)
+
+    def comment_to_url(self, obj, msg, result_url):
+        """hacky"""
+        result_url = [x for x in result_url.split('/') if len(x)]
+        return_obj = None
+        retry_attemts = username_bank.username_count
+        username_bank.prev_username = username_bank.reddit_username
+
+        for retry in range(retry_attemts):
+            try:
+                if len(result_url) == 7:
+                    return_obj = obj.add_comment(msg)
+                    debug('NOTICE ADDED to ID:{0}'.format(obj.id))
+                    break
+                elif len(result_url) == 8:
+                    return_obj = obj.comments[0].reply(msg)
+                    debug('NOTICE REPLIED to ID:{0}'.format(obj.comments[0].id))
+                    break
+            except:
+                log_this('{1} is BANNED in:{0}, trying to relog'.format(obj.subreddit, username_bank.reddit_username))
+                self.login()
+
+        username_bank.prev_username_login()
+        username_bank.purge_tried_list()
+        return return_obj
+
+    def get_submission_by_url(self, url):
+        return self.socmedia.reddit_session.get_submission(url)
+
+    def send_pm_to_owner(self, pm_text):
+        try:
+            self.socmedia.reddit_session.user.send_message(botconfig.bot_auth_info['REDDIT_PM_TO'], pm_text)
+        except:
+            log_this('ERROR:Cant send pm')
+
+    @staticmethod
+    def make_np(link):
+        return link.replace('http://www.reddit.com', 'http://np.reddit.com')
+
+    def tweet_this(self, msg):
+        if len(msg) > 140:
+            msg = msg[:139]
+            log_this('MSG exceeding 140 characters!!')
+        try:
+            self.socmedia.twitter_session.update_status(status=msg)
+            debug('TWEET SENT!!!')
+        except:
+            log_this('ERROR: couldnt update twitter status')
+
+
+
+
+
 class WatchedTreads:
     watched_threads_list = []
 
@@ -225,7 +326,6 @@ class WatchedTreads:
         self.poster_username = poster_username
         self.keep_alive = 43200  # time to watch a thread in seconds
 
-
         WatchedTreads.watched_threads_list.append(self)
         self.savecache()
 
@@ -236,46 +336,6 @@ class WatchedTreads:
                 pickle.dump(WatchedTreads.watched_threads_list, fa)
         except:
             log_this('ERROR: Cant write cache file')
-
-    @staticmethod
-    def get_user_karma_balance(author, in_subreddit, user_comments_limit=200):
-        user_srs_karma_balance = 0
-
-        try:
-            user = socmedia.reddit_session.get_redditor(author)
-            for usercomment in user.get_overview(limit=user_comments_limit):
-                if str(usercomment.subreddit) == in_subreddit:
-                    user_srs_karma_balance += usercomment.score
-        except:
-            log_this('ERROR: Cant get user SRS karma balance!!')
-        return user_srs_karma_balance
-
-    @staticmethod
-    def get_authors_in_thread(thread):
-        authors_list = []
-        submission = socmedia.reddit_session.get_submission(thread)
-        try:
-            submission.replace_more_comments(limit=4, threshold=1)
-            for comment in praw.helpers.flatten_tree(submission.comments):
-                author = str(comment.author)
-                if author not in botconfig.bot_auth_info['REDDIT_BOT_USERNAME']:
-                    authors_list.append(author)
-        except:
-            log_this('ERROR:couldnt get all authors from thread')
-        return authors_list
-
-    @staticmethod
-    def edit_comment(comment_id, comment_body, poster_username):
-        username_bank.prev_username = username_bank.reddit_username
-        if username_bank.reddit_username != poster_username:
-            socmedia.login(poster_username)
-        try:
-            comment = socmedia.reddit_session.get_info(thing_id=comment_id)
-            comment.edit(comment_body)
-            debug('Comment : {} edited.'.format(comment_id))
-            username_bank.prev_username_login()
-        except:
-            log_this('ERROR: Cant edit comment')
 
     @staticmethod
     def add_user_to_database(username, subreddit, srs_karma):
@@ -319,10 +379,10 @@ class WatchedTreads:
             srs_users = []
             debug('Now processing: {}'.format(thread.thread_url))
 
-            for author in WatchedTreads.get_authors_in_thread(thread=thread.thread_url):
+            for author in reddit_operations.get_authors_in_thread(thread=thread.thread_url):
                 if author not in thread.already_processed_users:
                     debug('--Checking user: {}'.format(author), end=" ")
-                    user_srs_karma_balance = WatchedTreads.get_user_karma_balance(author=author,
+                    user_srs_karma_balance = reddit_operations.get_user_karma_balance(author=author,
                                                                                   in_subreddit=thread.srs_subreddit)
                     debug(',/r/{0} karma score:{1} '.format(thread.srs_subreddit, user_srs_karma_balance), end=" ")
                     if user_srs_karma_balance >= karma_upper_limit:
@@ -347,8 +407,9 @@ class WatchedTreads:
         splitted_comment = thread.bot_reply_body.split(split_mark, 1)
         srs_users_lines = ''.join(['\n\n* [/u/' + user + '](http://np.reddit.com/u/' + user + ')'for user in srs_users])
         thread.bot_reply_body = splitted_comment[0] + srs_users_lines + split_mark + splitted_comment[1]
-        WatchedTreads.edit_comment(comment_id=thread.bot_reply_object_id, comment_body=thread.bot_reply_body,
-                                   poster_username=thread.poster_username)
+        reddit_operations.edit_comment(comment_id=thread.bot_reply_object_id,
+                                       comment_body=thread.bot_reply_body,
+                                       poster_username=thread.poster_username)
 
     @staticmethod
     def check_if_expired(thread):
@@ -427,7 +488,7 @@ class MatchedSubmissions:
         if self.is_srs:
             quote = QuoteBank()
             quote = quote.get_quote(self.args['keyword_lists']['quotes'], self.args['dsubmission'].title)
-            submissionlink = make_np(self.args['dsubmission'].permalink)
+            submissionlink = reddit_operations.make_np(self.args['dsubmission'].permalink)
             brigade_subreddit_link = '*[/r/{0}]({1})*'.format(self.args['dsubmission'].subreddit, submissionlink)
             notification = ['Notice',
                             'Public Service Announcement',
@@ -553,18 +614,13 @@ class ReddBot:
             self.pulllimit[target] = lastpullnum + add_more[target]
         return int(self.pulllimit[target])
 
-    @staticmethod
-    def get_comments_or_subs(placeholder_id='', subreddit=watched_subreddit,
-                             limit=results_limit, target='submissions'):
-        if target == 'submissions':
-            return socmedia.reddit_session.get_subreddit(subreddit).get_new(limit=limit,
-                                                                            place_holder=placeholder_id)
-        if target == 'comments':
-            return socmedia.reddit_session.get_comments(subreddit, limit=limit)
+
 
     def _get_new_comments_or_subs(self, target):
-        results = ReddBot.get_comments_or_subs(placeholder_id=self.placeholder_id, subreddit=watched_subreddit,
-                                               limit=self.pulllimit[target], target=target)
+        results = reddit_operations.get_comments_or_subs(placeholder_id=self.placeholder_id,
+                                                         subreddit=watched_subreddit,
+                                                         limit=self.pulllimit[target],
+                                                         target=target)
 
         new_submissions_list = []
         try:
@@ -591,37 +647,11 @@ class ReddBot:
                 self.dispatch_nitifications(results_list=MatchedSubmissions.matching_results)
                 MatchedSubmissions.purge_list()
 
-    @staticmethod
-    def commenter(obj, msg, result_url):
-        """hacky"""
-        result_url = [x for x in result_url.split('/') if len(x)]
-        return_obj = None
-        retry_attemts = username_bank.username_count
-        username_bank.prev_username = username_bank.reddit_username
-
-        for retry in range(retry_attemts):
-            try:
-                if len(result_url) == 7:
-                    return_obj = obj.add_comment(msg)
-                    debug('NOTICE ADDED to ID:{0}'.format(obj.id))
-                    break
-                elif len(result_url) == 8:
-                    return_obj = obj.comments[0].reply(msg)
-                    debug('NOTICE REPLIED to ID:{0}'.format(obj.comments[0].id))
-                    break
-            except:
-                log_this('{1} is BANNED in:{0}, trying to relog'.format(obj.subreddit, username_bank.reddit_username))
-                socmedia.login()
-
-        username_bank.prev_username_login()
-        username_bank.purge_tried_list()
-        return return_obj
-
     def dispatch_nitifications(self, results_list):
         for result in results_list:
             if result.msg_for_reply:
                 try:
-                    targeted_submission = socmedia.reddit_session.get_submission(result.url)
+                    targeted_submission = reddit_operations.get_submission_by_url(result.url)
                 except:
                     log_this('ERROR: cant get submission by url, Invalid submission url!?')
                     targeted_submission = None
@@ -634,9 +664,9 @@ class ReddBot:
                                 already_watched = True
                         if not already_watched:
                             try:
-                                reply = self.commenter(obj=targeted_submission,
-                                                       msg=result.msg_for_reply,
-                                                       result_url=result.url)
+                                reply = reddit_operations.comment_to_url(obj=targeted_submission,
+                                                                         msg=result.msg_for_reply,
+                                                                         result_url=result.url)
                                 WatchedTreads(thread_url=result.url,
                                               srs_subreddit=str(result.args['dsubmission'].subreddit),
                                               srs_author=str(result.args['dsubmission'].author),
@@ -649,32 +679,9 @@ class ReddBot:
                         else:
                             debug("THREAD ALREADY WATCHED!")
 
-
             if result.msg_for_tweet:
-                tweet_this(result.msg_for_tweet)
+                reddit_operations.tweet_this(result.msg_for_tweet)
                 debug('New Topic Match in: {}'.format(result.args['dsubmission'].subreddit))
-
-
-def send_pm_to_owner(pm_text):
-    try:
-        socmedia.reddit_session.user.send_message(botconfig.bot_auth_info['REDDIT_PM_TO'], pm_text)
-    except:
-        log_this('ERROR:Cant send pm')
-
-
-def make_np(link):
-    return link.replace('http://www.reddit.com', 'http://np.reddit.com')
-
-
-def tweet_this(msg):
-    if len(msg) > 140:
-        msg = msg[:139]
-        log_this('MSG exceeding 140 characters!!')
-    try:
-        socmedia.twitter_session.update_status(status=msg)
-        debug('TWEET SENT!!!')
-    except:
-        log_this('ERROR: couldnt update twitter status')
 
 
 def log_this(logtext):
@@ -691,8 +698,8 @@ def debug(debugtext, level=DEBUG_LEVEL, end='\n'):
 start_time = time.time()
 botconfig = ConfigFiles()
 username_bank = UsernameBank()
-socmedia = SocialMedia()
-socmedia.login(username_bank.defaut_username)
+reddit_operations = RedditOperations()
+reddit_operations.login(username_bank.defaut_username)
 bot1 = ReddBot()
 
 
