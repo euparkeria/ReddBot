@@ -230,14 +230,14 @@ class RedditOperations:
 
     def get_authors_in_thread(self, thread):
         authors_list = []
-        submission = self.socmedia.reddit_session.get_submission(thread)
         try:
+            submission = self.socmedia.reddit_session.get_submission(thread)
             submission.replace_more_comments(limit=4, threshold=1)
             for comment in praw.helpers.flatten_tree(submission.comments):
                 author = str(comment.author)
                 if author not in botconfig.bot_auth_info['REDDIT_BOT_USERNAME']:
                     authors_list.append(author)
-        except:
+        except praw.errors.APIException:
             log_this('ERROR:couldnt get all authors from thread')
         return authors_list
 
@@ -250,7 +250,7 @@ class RedditOperations:
             comment.edit(comment_body)
             debug('Comment : {} edited.'.format(comment_id))
             username_bank.prev_username_login()
-        except:
+        except praw.errors.APIException:
             log_this('ERROR: Cant edit comment')
 
     def get_comments_or_subs(self, placeholder_id='', subreddit=watched_subreddit,
@@ -278,7 +278,7 @@ class RedditOperations:
                     return_obj = obj.comments[0].reply(msg)
                     debug('NOTICE REPLIED to ID:{0}'.format(obj.comments[0].id))
                     break
-            except:
+            except praw.errors.APIException:
                 log_this('{1} is BANNED in:{0}, trying to relog'.format(obj.subreddit, username_bank.reddit_username))
                 self.login()
 
@@ -292,7 +292,7 @@ class RedditOperations:
     def send_pm_to_owner(self, pm_text):
         try:
             self.socmedia.reddit_session.user.send_message(botconfig.bot_auth_info['REDDIT_PM_TO'], pm_text)
-        except:
+        except praw.errors.APIException:
             log_this('ERROR:Cant send pm')
 
     @staticmethod
@@ -640,8 +640,6 @@ class ReddBot:
             self.pulllimit[target] = lastpullnum + add_more[target]
         return int(self.pulllimit[target])
 
-
-
     def _get_new_comments_or_subs(self, target):
         results = reddit_operations.get_comments_or_subs(placeholder_id=self.placeholder_id,
                                                          subreddit=watched_subreddit,
@@ -657,7 +655,7 @@ class ReddBot:
                     self.cont_num[target] += 1   # count the number of submissions processed each run
             if new_submissions_list:
                 self.placeholder_id = new_submissions_list[0].id
-        except:
+        except praw.errors.APIException:
             log_this('ERROR:Cannot connect to reddit!!!')
         return new_submissions_list
 
@@ -678,7 +676,7 @@ class ReddBot:
             if result.msg_for_reply:
                 try:
                     targeted_submission = reddit_operations.get_submission_by_url(result.url)
-                except:
+                except praw.errors.APIException:
                     log_this('ERROR: cant get submission by url, Invalid submission url!?')
                     targeted_submission = None
                 debug(result.url)
