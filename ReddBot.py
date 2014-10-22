@@ -508,7 +508,7 @@ class MatchedSubmissions:
                               .format(brigade_subreddit_link, updated_on)
                               ]
 
-            stars = ['★', '☭', '❤', '♀']
+            stars = ['★', '☭']
 
             their_title = ['Their title:',
                            'Their Submission title:',
@@ -517,7 +517,7 @@ class MatchedSubmissions:
 
             explanations = ['This thread has been targeted by a *possible* downvote-brigade from {0}'
                             .format(brigade_subreddit_link),
-                            'This post was just linked from {0} in a possible attempt to downvote-brigade it.'
+                            'This post was just linked from {0} in a possible attempt to downvote it.'
                             .format(brigade_subreddit_link),
                             'A possible downvote brigade attempt detected from {0}'
                             .format(brigade_subreddit_link),
