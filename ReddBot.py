@@ -6,7 +6,6 @@ import pickle
 import re
 
 from random import choice
-from requests import exceptions
 from twython import Twython
 from twython import TwythonError
 from sqlalchemy import create_engine
@@ -238,7 +237,7 @@ class RedditOperations:
                 author = str(comment.author)
                 if author not in botconfig.bot_auth_info['REDDIT_BOT_USERNAME']:
                     authors_list.append(author)
-        except (praw.errors.APIException, exceptions.HTTPError, exceptions.ConnectionError):
+        except (praw.errors.APIException, praw.requests.exceptions.HTTPError, praw.requests.exceptions.ConnectionError):
             log_this('ERROR:couldnt get all authors from thread')
         return authors_list
 
@@ -251,7 +250,7 @@ class RedditOperations:
             comment.edit(comment_body)
             debug('Comment : {} edited.'.format(comment_id))
             username_bank.prev_username_login()
-        except (praw.errors.APIException, exceptions.HTTPError, exceptions.ConnectionError):
+        except (praw.errors.APIException, praw.requests.exceptions.HTTPError, praw.requests.exceptions.ConnectionError):
             log_this('ERROR: Cant edit comment')
 
     def get_comments_or_subs(self, placeholder_id='', subreddit=watched_subreddit,
@@ -279,7 +278,7 @@ class RedditOperations:
                     return_obj = obj.comments[0].reply(msg)
                     debug('NOTICE REPLIED to ID:{0}'.format(obj.comments[0].id))
                     break
-            except (praw.errors.APIException, exceptions.HTTPError, exceptions.ConnectionError):
+            except (praw.errors.APIException, praw.requests.exceptions.HTTPError, praw.requests.exceptions.ConnectionError):
                 log_this('{1} is BANNED in:{0}, trying to relog'.format(obj.subreddit, username_bank.reddit_username))
                 self.login()
 
@@ -293,7 +292,7 @@ class RedditOperations:
     def send_pm_to_owner(self, pm_text):
         try:
             self.socmedia.reddit_session.user.send_message(botconfig.bot_auth_info['REDDIT_PM_TO'], pm_text)
-        except (praw.errors.APIException, exceptions.HTTPError, exceptions.ConnectionError):
+        except (praw.errors.APIException, praw.requests.exceptions.HTTPError, praw.requests.exceptions.ConnectionError):
             log_this('ERROR:Cant send pm')
 
     @staticmethod
@@ -677,7 +676,7 @@ class ReddBot:
             if result.msg_for_reply:
                 try:
                     targeted_submission = reddit_operations.get_submission_by_url(result.url)
-                except (praw.errors.APIException, exceptions.HTTPError, exceptions.ConnectionError):
+                except (praw.errors.APIException, praw.requests.exceptions.HTTPError, praw.requests.exceptions.ConnectionError):
                     log_this('ERROR: cant get submission by url, Invalid submission url!?')
                     targeted_submission = None
                 debug(result.url)
