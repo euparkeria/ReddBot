@@ -352,7 +352,11 @@ class WatchedTreads:
         self.savecache()
 
     def draw_graph(self):
-        p = ggplot(aes(x='Min', y='Score'), data=self.GraphData) + geom_point(color='coral') + geom_line() + theme_bw()
+        p = ggplot(aes(x='Min', y='Score'), data=self.GraphData) +\
+            geom_point(color='coral') +\
+            geom_line() +\
+            theme_bw() +\
+            scale_y_discrete()
         ggsave(p, '{}.png'.format(self.bot_reply_object_id))
 
     @staticmethod
