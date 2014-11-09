@@ -333,8 +333,7 @@ class RedditOperations:
 class WatchedTreads:
     watched_threads_list = []
 
-    def __init__(self, thread_url, srs_subreddit, srs_author, bot_reply_object_id, bot_reply_body, poster_username,
-                 targeted_submission_score):
+    def __init__(self, thread_url, srs_subreddit, srs_author, bot_reply_object_id, bot_reply_body, poster_username):
         self.thread_url = thread_url
         self.srs_subreddit = srs_subreddit
         self.srs_author = srs_author
@@ -344,7 +343,8 @@ class WatchedTreads:
         self.bot_reply_body = bot_reply_body
         self.poster_username = poster_username
         self.keep_alive = 43200  # time to watch a thread in seconds
-        self.GraphData = DataFrame(data=[(0, targeted_submission_score)], columns=['Min', 'Score'])
+        self.GraphData = DataFrame(data=[(0, reddit_operations.get_post_score(url=self.thread_url))],
+                                   columns=['Min', 'Score'])
 
         WatchedTreads.watched_threads_list.append(self)
 
@@ -732,8 +732,8 @@ class ReddBot:
                                               srs_author=str(result.args['dsubmission'].author),
                                               bot_reply_object_id=reply.name,
                                               bot_reply_body=reply.body,
-                                              poster_username=str(reply.author),
-                                              targeted_submission_score=targeted_submission.score)
+                                              poster_username=str(reply.author)
+                                              )
                                 #send_pm_to_owner("New Watch thread added by: {0} in: {1}".format(str(reply.author), result.url))
                             except AttributeError:
                                 log_this("ERROR: ALL USERS BANNED IN: {}".format(targeted_submission.subreddit))
