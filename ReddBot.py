@@ -4,8 +4,10 @@ import json
 import os
 import pickle
 import re
-
+from ggplot import *
+from pandas import DataFrame
 from random import choice
+from requests import exceptions
 from twython import Twython
 from twython import TwythonError
 from sqlalchemy import create_engine
@@ -14,7 +16,7 @@ from sqlalchemy import Column, Integer, String
 from sqlalchemy.orm import sessionmaker
 
 watched_subreddit = "+".join(['all'])
-results_limit = 100
+results_limit = 1000
 results_limit_comm = 900
 bot_agent_name = 'antibrigadebot 2.0 /u/antibrigadebot2'
 loop_timer = 60
@@ -216,6 +218,24 @@ class RedditOperations:
         except:
             log_this('ERROR: Cant login to Reddit.com')
 
+    def get_post_score(self, url):
+        post = self.socmedia.reddit_session.get_submission(url=url)
+        is_comment = reddit_operations.submission_or_comment(url)
+        if is_comment:
+            return post.comments[0].score
+        elif not is_comment:
+            return post.score
+
+    @staticmethod
+    def submission_or_comment(url):
+        """Returns True if Comment and False if Submission"""
+        result_url = [x for x in url.split('/') if len(x)]
+        if len(result_url) == 7:
+            return False
+        elif len(result_url) == 8:
+            return True
+
+
     def get_user_karma_balance(self, author, in_subreddit, user_comments_limit=200):
         user_srs_karma_balance = 0
 
@@ -263,18 +283,18 @@ class RedditOperations:
 
     def comment_to_url(self, obj, msg, result_url):
         """hacky"""
-        result_url = [x for x in result_url.split('/') if len(x)]
+        is_comment = reddit_operations.submission_or_comment(result_url)
         return_obj = None
         retry_attemts = username_bank.username_count
         username_bank.prev_username = username_bank.reddit_username
 
         for retry in range(retry_attemts):
             try:
-                if len(result_url) == 7:
+                if not is_comment:
                     return_obj = obj.add_comment(msg)
                     debug('NOTICE ADDED to ID:{0}'.format(obj.id))
                     break
-                elif len(result_url) == 8:
+                elif is_comment:
                     return_obj = obj.comments[0].reply(msg)
                     debug('NOTICE REPLIED to ID:{0}'.format(obj.comments[0].id))
                     break
@@ -313,7 +333,8 @@ class RedditOperations:
 class WatchedTreads:
     watched_threads_list = []
 
-    def __init__(self, thread_url, srs_subreddit, srs_author, bot_reply_object_id, bot_reply_body, poster_username):
+    def __init__(self, thread_url, srs_subreddit, srs_author, bot_reply_object_id, bot_reply_body, poster_username,
+                 targeted_submission_score):
         self.thread_url = thread_url
         self.srs_subreddit = srs_subreddit
         self.srs_author = srs_author
@@ -323,9 +344,16 @@ class WatchedTreads:
         self.bot_reply_body = bot_reply_body
         self.poster_username = poster_username
         self.keep_alive = 43200  # time to watch a thread in seconds
+        self.GraphData = DataFrame(data=[(0, targeted_submission_score)], columns=['Min', 'Score'])
 
         WatchedTreads.watched_threads_list.append(self)
+
+        self.draw_graph()
         self.savecache()
+
+    def draw_graph(self):
+        p = ggplot(aes(x='Min', y='Score'), data=self.GraphData) + geom_point(color='coral') + geom_line() + theme_bw()
+        ggsave(p, '{}.png'.format(self.bot_reply_object_id))
 
     @staticmethod
     def savecache():
@@ -367,37 +395,41 @@ class WatchedTreads:
         else:
             return False
 
-    @staticmethod
-    def update():
+    def update(self):
         debug('Currently Watching {} threads.'.format(len(WatchedTreads.watched_threads_list)))
 
         karma_upper_limit = 3  # if poster has more than that amount of karma in the srs subreddit he is added
+        srs_users = []
+        debug('Now processing: {}'.format(self.thread_url))
 
+        for author in reddit_operations.get_authors_in_thread(thread=self.thread_url):
+            if author not in self.already_processed_users:
+                debug('--Checking user: {}'.format(author), end=" ")
+                user_srs_karma_balance = reddit_operations.get_user_karma_balance(author=author,
+                                                                                  in_subreddit=self.srs_subreddit)
+                debug(',/r/{0} karma score:{1} '.format(self.srs_subreddit, user_srs_karma_balance), end=" ")
+                if user_srs_karma_balance >= karma_upper_limit:
+                    srs_users.append(author)
+                    WatchedTreads.add_user_to_database(username=author,
+                                                       subreddit=self.srs_subreddit,
+                                                       srs_karma=user_srs_karma_balance)
+                    debug('MATCH', end=" ")
+                debug('.')
+                self.already_processed_users.append(author)
+
+        if srs_users:
+            WatchedTreads.append_lines_to_comment(thread=self, srs_users=srs_users)
+
+        WatchedTreads.check_if_expired(self)
+        self.GraphData.loc[len(self.GraphData)] = [(time.time() - self.start_watch_time)/60,
+                                                   reddit_operations.get_post_score(url=self.thread_url)]
+        self.draw_graph()
+
+    @staticmethod
+    def update_all():
         for thread in WatchedTreads.watched_threads_list:
-            srs_users = []
-            debug('Now processing: {}'.format(thread.thread_url))
-
-            for author in reddit_operations.get_authors_in_thread(thread=thread.thread_url):
-                if author not in thread.already_processed_users:
-                    debug('--Checking user: {}'.format(author), end=" ")
-                    user_srs_karma_balance = reddit_operations.get_user_karma_balance(author=author,
-                                                                                      in_subreddit=thread.srs_subreddit)
-                    debug(',/r/{0} karma score:{1} '.format(thread.srs_subreddit, user_srs_karma_balance), end=" ")
-                    if user_srs_karma_balance >= karma_upper_limit:
-                        srs_users.append(author)
-                        WatchedTreads.add_user_to_database(username=author,
-                                                           subreddit=thread.srs_subreddit,
-                                                           srs_karma=user_srs_karma_balance)
-                        debug('MATCH', end=" ")
-                    debug('.')
-                    thread.already_processed_users.append(author)
-
-            if srs_users:
-                WatchedTreads.append_lines_to_comment(thread=thread, srs_users=srs_users)
-
-            WatchedTreads.check_if_expired(thread)
-
-        WatchedTreads.savecache()
+            thread.update()
+            WatchedTreads.savecache()
 
     @staticmethod
     def append_lines_to_comment(thread, srs_users):
@@ -593,7 +625,7 @@ class ReddBot:
     @staticmethod
     def _maintenance_functions():
         def watchthreads():
-            WatchedTreads.update()
+            WatchedTreads.update_all()
 
         def reloadconfig():
             botconfig.check_for_updated_config()
@@ -696,7 +728,8 @@ class ReddBot:
                                               srs_author=str(result.args['dsubmission'].author),
                                               bot_reply_object_id=reply.name,
                                               bot_reply_body=reply.body,
-                                              poster_username=str(reply.author))
+                                              poster_username=str(reply.author),
+                                              targeted_submission_score=targeted_submission.score)
                                 #send_pm_to_owner("New Watch thread added by: {0} in: {1}".format(str(reply.author), result.url))
                             except AttributeError:
                                 log_this("ERROR: ALL USERS BANNED IN: {}".format(targeted_submission.subreddit))
