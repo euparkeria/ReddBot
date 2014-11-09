@@ -352,11 +352,13 @@ class WatchedTreads:
         self.savecache()
 
     def draw_graph(self):
-        p = ggplot(aes(x='Min', y='Score'), data=self.GraphData) +\
+
+        p = ggplot(aes(x='Minutes', y='Targeted Post Karma'), data=self.GraphData, ) +\
             geom_point(color='coral') +\
-            geom_line() +\
+            geom_line(colour="pink") +\
             theme_bw() +\
-            scale_y_discrete()
+            scale_y_discrete() +\
+            stat_smooth(colour='magenta')
         ggsave(p, '{}.png'.format(self.bot_reply_object_id))
 
     @staticmethod
