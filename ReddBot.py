@@ -353,7 +353,7 @@ class WatchedTreads:
 
     def draw_graph(self):
 
-        p = ggplot(aes(x='Minutes', y='Targeted Post Karma'), data=self.GraphData, ) +\
+        p = ggplot(aes(x='Min', y='Score'), data=self.GraphData, ) +\
             geom_point(color='coral') +\
             geom_line(colour="pink") +\
             theme_bw() +\
