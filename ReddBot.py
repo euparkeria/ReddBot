@@ -14,6 +14,8 @@ from sqlalchemy import create_engine
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy import Column, Integer, String
 from sqlalchemy.orm import sessionmaker
+from imgurpython import ImgurClient
+
 
 watched_subreddit = "+".join(['all'])
 results_limit = 1000
@@ -76,6 +78,7 @@ class SocialMedia:
     def __init__(self):
         self.reddit_session = self.connect_to_reddit()
         self.twitter_session = self.connect_to_twitter()
+        self.imgur_client = self.connect_to_imgur()
 
     @staticmethod
     def connect_to_reddit():
@@ -85,11 +88,19 @@ class SocialMedia:
     @staticmethod
     def connect_to_twitter():
         try:
-            t = Twython(botconfig.bot_auth_info['APP_KEY'], botconfig.bot_auth_info['APP_SECRET'],
-                        botconfig.bot_auth_info['OAUTH_TOKEN'], botconfig.bot_auth_info['OAUTH_TOKEN_SECRET'])
+            t = Twython(botconfig.bot_auth_info['APP_KEY'],
+                        botconfig.bot_auth_info['APP_SECRET'],
+                        botconfig.bot_auth_info['OAUTH_TOKEN'],
+                        botconfig.bot_auth_info['OAUTH_TOKEN_SECRET'])
         except TwythonError:
             log_this('ERROR: Cant authenticate into twitter')
         return t
+
+    @staticmethod
+    def connect_to_imgur():
+        imgur_client = ImgurClient(botconfig.bot_auth_info['IMGUR_CLIENT_ID'],
+                                   botconfig.bot_auth_info['IMGUR_CLIENT_SECRET'])
+        return imgur_client
 
 
 class ConfigFiles:
@@ -203,9 +214,14 @@ class QuoteBank:
 
 
 class RedditOperations:
+    """Contains reddit, twitter and imgur api related operations"""
 
     def __init__(self):
         self.socmedia = SocialMedia()
+
+    def upload_image(self, image_path):
+        image_id = self.socmedia.imgur_client.upload_from_path(path=image_path)
+        return image_id
 
     def login(self, username=''):
         try:
@@ -340,9 +356,10 @@ class WatchedTreads:
         self.start_watch_time = time.time()
         self.already_processed_users = []
         self.bot_reply_object_id = bot_reply_object_id
-        self.bot_reply_body = bot_reply_body
+        self.bot_body = bot_reply_body
         self.poster_username = poster_username
         self.keep_alive = 43200  # time to watch a thread in seconds
+        self.graph_image_link = ''
         self.GraphData = DataFrame(data=[(0, reddit_operations.get_post_score(url=self.thread_url))],
                                    columns=['Min', 'Score'])
 
@@ -352,14 +369,20 @@ class WatchedTreads:
         self.savecache()
 
     def draw_graph(self):
+        filename = '{}.png'.format(self.bot_reply_object_id)
 
         p = ggplot(aes(x='Min', y='Score'), data=self.GraphData, ) +\
-            geom_point(color='coral') +\
+            geom_point(color='red', size=20) +\
             geom_line(colour="pink") +\
-            theme_bw() +\
-            scale_y_discrete() +\
-            stat_smooth(colour='magenta')
-        ggsave(p, '{}.png'.format(self.bot_reply_object_id))
+            theme_seaborn(context='paper') +\
+            stat_smooth(colour='magenta') +\
+            scale_y_continuous("Targeted post Karma") +\
+            scale_x_continuous("Minutes since brigade began") +\
+            labs(title="Brigade Effect Graph") +\
+            xlim(0)
+
+        ggsave(p, filename, width=8, height=5, dpi=100, scale=1)
+        return filename
 
     @staticmethod
     def savecache():
@@ -402,8 +425,6 @@ class WatchedTreads:
             return False
 
     def update(self):
-        debug('Currently Watching {} threads.'.format(len(WatchedTreads.watched_threads_list)))
-
         karma_upper_limit = 3  # if poster has more than that amount of karma in the srs subreddit he is added
         srs_users = []
         debug('Now processing: {}'.format(self.thread_url))
@@ -424,36 +445,43 @@ class WatchedTreads:
                 self.already_processed_users.append(author)
 
         if srs_users:
-            WatchedTreads.append_lines_to_comment(thread=self, srs_users=srs_users)
+            self.bot_body = self.make_user_lines(srs_users=srs_users)
 
-        WatchedTreads.check_if_expired(self)
         self.GraphData.loc[len(self.GraphData)] = [(time.time() - self.start_watch_time)/60,
                                                    reddit_operations.get_post_score(url=self.thread_url)]
-        self.draw_graph()
+        graph_image_name = self.draw_graph()
+
+        amm = reddit_operations.upload_image(graph_image_name)
+        self.graph_image_link = amm['link']
+        # edit body to include image
+        print(self.graph_image_link)
+        reddit_operations.edit_comment(comment_id=self.bot_reply_object_id,
+                                       comment_body=self.bot_body,
+                                       poster_username=self.poster_username)
+
+        if self.check_if_expired():
+            debug('--Watched Thread Expired and Removed!')
 
     @staticmethod
     def update_all():
+        debug('Currently Watching {} threads.'.format(len(WatchedTreads.watched_threads_list)))
         for thread in WatchedTreads.watched_threads_list:
             thread.update()
             WatchedTreads.savecache()
 
-    @staticmethod
-    def append_lines_to_comment(thread, srs_users):
+    def make_user_lines(self, srs_users):
         split_mark = '\n\n-----\n'
-        splitted_comment = thread.bot_reply_body.split(split_mark, 1)
+        splitted_comment = self.bot_body.split(split_mark, 1)
         srs_users_lines = ''.join(['\n\n* [/u/' + user + '](http://np.reddit.com/u/' + user + ')'for user in srs_users])
-        thread.bot_reply_body = splitted_comment[0] + srs_users_lines + split_mark + splitted_comment[1]
-        reddit_operations.edit_comment(comment_id=thread.bot_reply_object_id,
-                                       comment_body=thread.bot_reply_body,
-                                       poster_username=thread.poster_username)
+        return splitted_comment[0] + srs_users_lines + split_mark + splitted_comment[1]
 
-    @staticmethod
-    def check_if_expired(thread):
-            time_watched = time.time() - thread.start_watch_time
+    def check_if_expired(self):
+            time_watched = time.time() - self.start_watch_time
             debug('--Watched for {} hours'.format(time_watched/60/60))
-            if time_watched > thread.keep_alive:  # if older than 8 hours
-                WatchedTreads.watched_threads_list.remove(thread)
-                debug('--Watched Thread Removed!')
+            if time_watched > self.keep_alive:  # if older than 8 hours
+                WatchedTreads.watched_threads_list.remove(self)
+                return True
+
 
 
 class MatchedSubmissions:
