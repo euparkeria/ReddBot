@@ -551,6 +551,7 @@ class MatchedSubmissions:
         MatchedSubmissions.matching_results = []
 
     def _brigade_message(self):
+        """needs to be redone completely"""
         if self.is_srs:
             quote = QuoteBank()
             quote = quote.get_quote(self.args['keyword_lists']['quotes'], self.args['dsubmission'].title)
@@ -560,8 +561,7 @@ class MatchedSubmissions:
             greetings = ['Notice',
                          'Public Service Announcement',
                          'Attention',
-                         'Advisory',
-                         'Friendly Alert'
+                         'Advisory'
                          ]
 
             updated_on = '^updated ^every ^5 ^minutes ^for ^12 ^hours.'
@@ -571,17 +571,12 @@ class MatchedSubmissions:
                               'Redditors from {0} involved in this thread:{1}'
                               .format(brigade_subreddit_link, updated_on),
                               'Subscribers of {0} active in this thread:{1}'
-                              .format(brigade_subreddit_link, updated_on),
-                              'Brigadiers from {0} active in this thread:{1}'
                               .format(brigade_subreddit_link, updated_on)
                               ]
 
             stars = ['★', '☭']
 
-            their_title = ['Their title:',
-                           'Their Submission title:',
-                           'Title of their Submission:',
-                           'Brigade Submission title:']
+            their_title = ['Their title:']
 
             explanations = ['This thread has been targeted by a *possible* downvote-brigade from {0}'
                             .format(brigade_subreddit_link),
