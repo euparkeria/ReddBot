@@ -445,15 +445,17 @@ class WatchedTreads:
                 self.already_processed_users.append(author)
 
         if srs_users:
-            self.bot_body = self.make_user_lines(srs_users=srs_users)
+            self.bot_body = self.add_user_lines(srs_users=srs_users)
 
         self.GraphData.loc[len(self.GraphData)] = [(time.time() - self.start_watch_time)/60,
                                                    reddit_operations.get_post_score(url=self.thread_url)]
         graph_image_name = self.draw_graph()
 
-        amm = reddit_operations.upload_image(graph_image_name)
-        self.graph_image_link = amm['link']
+        imgurl_image = reddit_operations.upload_image(graph_image_name)
+        self.graph_image_link = imgurl_image['link']
         # edit body to include image
+        self.bot_body = re.sub('-- \[(.*)]\^\*beta\* --', '-- [[Karma Graph]({})]^*beta* --'.format(self.graph_image_link), self.bot_body)
+
         print(self.graph_image_link)
         reddit_operations.edit_comment(comment_id=self.bot_reply_object_id,
                                        comment_body=self.bot_body,
@@ -469,10 +471,10 @@ class WatchedTreads:
             thread.update()
             WatchedTreads.savecache()
 
-    def make_user_lines(self, srs_users):
-        split_mark = '\n\n-----\n'
+    def add_user_lines(self, srs_users):
+        split_mark = '\n\n-- ['
         splitted_comment = self.bot_body.split(split_mark, 1)
-        srs_users_lines = ''.join(['\n\n* [/u/' + user + '](http://np.reddit.com/u/' + user + ')'for user in srs_users])
+        srs_users_lines = ''.join(['\n\n* [/u/' + user + '](http://np.reddit.com/u/' + user + ')\n\n'for user in srs_users])
         return splitted_comment[0] + srs_users_lines + split_mark + splitted_comment[1]
 
     def check_if_expired(self):
@@ -594,6 +596,7 @@ class MatchedSubmissions:
                      '**{0}**\n\n'.format(choice(their_title)),
                      '* *{0}*\n\n'.format(self.args['dsubmission'].title),
                      '**{0}**\n\n'.format(choice(members_active)),
+                     '-- [*Waiting for Karma Graph*]^*beta* --\n\n'
                      '\n\n-----\n',
                      '^{1} *{0}* ^{1}\n\n'.format(quote, choice(stars)),
                      ]
