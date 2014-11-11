@@ -772,7 +772,6 @@ class ReddBot:
                     targeted_submission = None
                 debug(result.url)
                 if targeted_submission:
-
                         already_watched = False
                         for thread in WatchedTreads.watched_threads_list:
                             if thread.thread_url in result.url:
