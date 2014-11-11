@@ -1,4 +1,5 @@
 import time
+from imgurpython.helpers.error import ImgurClientRateLimitError, ImgurClientError
 import praw
 import json
 import os
@@ -220,8 +221,12 @@ class RedditOperations:
         self.socmedia = SocialMedia()
 
     def upload_image(self, image_path):
-        image_id = self.socmedia.imgur_client.upload_from_path(path=image_path)
-        return image_id
+        try:
+            image_object = self.socmedia.imgur_client.upload_from_path(path=image_path)
+        except (ImgurClientRateLimitError, ImgurClientError):
+            debug('ERROR: Imgur Rate Limit Exceeded')
+            return False
+        return image_object
 
     def login(self, username=''):
         try:
@@ -231,16 +236,21 @@ class RedditOperations:
             username_bank.reddit_username = username
             debug('Sucessfully logged in as {0}'.format(username_bank.reddit_username))
             time.sleep(3)
-        except:
+        except praw.errors.APIException:
             log_this('ERROR: Cant login to Reddit.com')
 
     def get_post_score(self, url):
-        post = self.socmedia.reddit_session.get_submission(url=url)
-        is_comment = reddit_operations.submission_or_comment(url)
-        if is_comment:
-            return post.comments[0].score
-        elif not is_comment:
-            return post.score
+        score = None
+        try:
+            post = self.socmedia.reddit_session.get_submission(url=url)
+            is_comment = reddit_operations.submission_or_comment(url)
+            if is_comment:
+                score = post.comments[0].score
+            elif not is_comment:
+                score = post.score
+        except (praw.errors.APIException, praw.errors.ClientException):
+            debug("Error: Couldnt get post score")
+        return score
 
     @staticmethod
     def submission_or_comment(url):
@@ -251,7 +261,6 @@ class RedditOperations:
         elif len(result_url) == 8:
             return True
 
-
     def get_user_karma_balance(self, author, in_subreddit, user_comments_limit=200):
         user_srs_karma_balance = 0
 
@@ -260,7 +269,7 @@ class RedditOperations:
             for usercomment in user.get_overview(limit=user_comments_limit):
                 if str(usercomment.subreddit) == in_subreddit:
                     user_srs_karma_balance += usercomment.score
-        except:
+        except (praw.errors.APIException, praw.errors.ClientException):
             log_this('ERROR: Cant get user SRS karma balance!!')
         return user_srs_karma_balance
 
@@ -360,6 +369,7 @@ class WatchedTreads:
         self.poster_username = poster_username
         self.keep_alive = 43200  # time to watch a thread in seconds
         self.graph_image_link = ''
+        self.last_parent_post_score = None
         self.GraphData = DataFrame(data=[(0, reddit_operations.get_post_score(url=self.thread_url))],
                                    columns=['Min', 'Score'])
 
@@ -425,6 +435,30 @@ class WatchedTreads:
             return False
 
     def update(self):
+        bot_comment_changed = False
+
+        new_invaders_list = self.check_for_new_invaders()
+
+        if new_invaders_list:
+            self.bot_body = self.add_user_lines(srs_users=new_invaders_list)
+            bot_comment_changed = True
+
+        current_parent_post_score = reddit_operations.get_post_score(url=self.thread_url)
+
+        if self.last_parent_post_score is not current_parent_post_score:
+            self.last_parent_post_score = current_parent_post_score
+            self.update_graph()
+            bot_comment_changed = True
+
+        if bot_comment_changed:
+            reddit_operations.edit_comment(comment_id=self.bot_reply_object_id,
+                                           comment_body=self.bot_body,
+                                           poster_username=self.poster_username)
+
+        if self.check_if_expired():
+            debug('--Watched Thread Expired and Removed!')
+
+    def check_for_new_invaders(self):
         karma_upper_limit = 3  # if poster has more than that amount of karma in the srs subreddit he is added
         srs_users = []
         debug('Now processing: {}'.format(self.thread_url))
@@ -443,26 +477,19 @@ class WatchedTreads:
                     debug('MATCH', end=" ")
                 debug('.')
                 self.already_processed_users.append(author)
+        return srs_users
 
-        if srs_users:
-            self.bot_body = self.add_user_lines(srs_users=srs_users)
-
+    def update_graph(self):
         self.GraphData.loc[len(self.GraphData)] = [(time.time() - self.start_watch_time)/60,
-                                                   reddit_operations.get_post_score(url=self.thread_url)]
+                                                   self.last_parent_post_score]
         graph_image_name = self.draw_graph()
 
         imgurl_image = reddit_operations.upload_image(graph_image_name)
-        self.graph_image_link = imgurl_image['link']
-        # edit body to include image
-        self.bot_body = re.sub('-- \[(.*)]\^\*beta\* --', '-- [[Karma Graph]({})]^*beta* --'.format(self.graph_image_link), self.bot_body)
+        if imgurl_image:
+            self.graph_image_link = imgurl_image['link']
 
-        print(self.graph_image_link)
-        reddit_operations.edit_comment(comment_id=self.bot_reply_object_id,
-                                       comment_body=self.bot_body,
-                                       poster_username=self.poster_username)
-
-        if self.check_if_expired():
-            debug('--Watched Thread Expired and Removed!')
+            self.bot_body = re.sub('-- \[(.*)]\^\*beta\* --', '-- [[Karma Graph]({})]^*beta* --'
+                                   .format(self.graph_image_link), self.bot_body)
 
     @staticmethod
     def update_all():
@@ -560,8 +587,7 @@ class MatchedSubmissions:
 
             greetings = ['Notice',
                          'Public Service Announcement',
-                         'Attention',
-                         'Advisory'
+                         'Attention'
                          ]
 
             updated_on = '^updated ^every ^5 ^minutes ^for ^12 ^hours.'
