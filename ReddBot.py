@@ -8,6 +8,7 @@ import re
 from ggplot import *
 from pandas import DataFrame
 from random import choice
+from praw.errors import APIException, ClientException
 from requests import exceptions
 from twython import Twython
 from twython import TwythonError
@@ -269,7 +270,7 @@ class RedditOperations:
             for usercomment in user.get_overview(limit=user_comments_limit):
                 if str(usercomment.subreddit) == in_subreddit:
                     user_srs_karma_balance += usercomment.score
-        except (praw.errors.APIException, praw.errors.ClientException):
+        except (APIException, ClientException):
             log_this('ERROR: Cant get user SRS karma balance!!')
         return user_srs_karma_balance
 
@@ -282,7 +283,7 @@ class RedditOperations:
                 author = str(comment.author)
                 if author not in botconfig.bot_auth_info['REDDIT_BOT_USERNAME']:
                     authors_list.append(author)
-        except (praw.errors.APIException, praw.requests.exceptions.HTTPError, praw.requests.exceptions.ConnectionError):
+        except (APIException, praw.requests.exceptions.HTTPError, praw.requests.exceptions.ConnectionError):
             log_this('ERROR:couldnt get all authors from thread')
         return authors_list
 
@@ -295,7 +296,7 @@ class RedditOperations:
             comment.edit(comment_body)
             debug('Comment : {} edited.'.format(comment_id))
             username_bank.prev_username_login()
-        except (praw.errors.APIException, praw.requests.exceptions.HTTPError, praw.requests.exceptions.ConnectionError):
+        except (APIException, praw.requests.exceptions.HTTPError, praw.requests.exceptions.ConnectionError):
             log_this('ERROR: Cant edit comment')
 
     def get_comments_or_subs(self, placeholder_id='', subreddit=watched_subreddit,
@@ -337,7 +338,7 @@ class RedditOperations:
     def send_pm_to_owner(self, pm_text):
         try:
             self.socmedia.reddit_session.user.send_message(botconfig.bot_auth_info['REDDIT_PM_TO'], pm_text)
-        except (praw.errors.APIException, praw.requests.exceptions.HTTPError, praw.requests.exceptions.ConnectionError):
+        except (APIException, praw.requests.exceptions.HTTPError, praw.requests.exceptions.ConnectionError):
             log_this('ERROR:Cant send pm')
 
     @staticmethod
@@ -766,7 +767,7 @@ class ReddBot:
             if result.msg_for_reply:
                 try:
                     targeted_submission = reddit_operations.get_submission_by_url(result.url)
-                except (praw.errors.APIException, praw.requests.exceptions.HTTPError, praw.requests.exceptions.ConnectionError):
+                except (APIException, praw.requests.exceptions.HTTPError, praw.requests.exceptions.ConnectionError):
                     log_this('ERROR: cant get submission by url, Invalid submission url!?')
                     targeted_submission = None
                 debug(result.url)
