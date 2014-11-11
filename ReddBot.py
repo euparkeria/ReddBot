@@ -249,7 +249,10 @@ class RedditOperations:
                 score = post.comments[0].score
             elif not is_comment:
                 score = post.score
-        except (praw.errors.APIException, praw.errors.ClientException):
+        except (APIException,
+                ClientException,
+                praw.requests.exceptions.HTTPError,
+                praw.requests.exceptions.ConnectionError):
             debug("Error: Couldnt get post score")
         return score
 
@@ -324,7 +327,9 @@ class RedditOperations:
                     return_obj = obj.comments[0].reply(msg)
                     debug('NOTICE REPLIED to ID:{0}'.format(obj.comments[0].id))
                     break
-            except (praw.errors.APIException, praw.requests.exceptions.HTTPError, praw.requests.exceptions.ConnectionError):
+            except (praw.errors.APIException,
+                    praw.requests.exceptions.HTTPError,
+                    praw.requests.exceptions.ConnectionError):
                 log_this('{1} is BANNED in:{0}, trying to relog'.format(obj.subreddit, username_bank.reddit_username))
                 self.login()
 
