@@ -594,31 +594,20 @@ class MatchedSubmissions:
             submissionlink = reddit_operations.make_np(self.args['dsubmission'].permalink)
             brigade_subreddit_link = '*[/r/{0}]({1})*'.format(self.args['dsubmission'].subreddit, submissionlink)
 
-            greetings = ['Notice',
-                         'Public Service Announcement',
-                         'Attention'
-                         ]
+            greetings = ['Notice']
 
             updated_on = '^updated ^every ^5 ^minutes ^for ^12 ^hours.'
 
-            members_active = ['Members of {0} active in this thread:{1}'
-                              .format(brigade_subreddit_link, updated_on),
-                              'Redditors from {0} involved in this thread:{1}'
-                              .format(brigade_subreddit_link, updated_on),
-                              'Subscribers of {0} active in this thread:{1}'
-                              .format(brigade_subreddit_link, updated_on)
-                              ]
+            members_active = ['Members of {0} active in this thread:{1}'.format(brigade_subreddit_link, updated_on)]
 
             stars = ['★', '☭']
 
-            their_title = ['Their title:']
+            their_title = ['Title:']
 
             explanations = ['This thread has been targeted by a *possible* downvote-brigade from {0}'
                             .format(brigade_subreddit_link),
-                            'This post was just linked from {0} in a possible attempt to downvote it.'
-                            .format(brigade_subreddit_link),
-                            'A possible downvote brigade attempt detected from {0}'
-                            .format(brigade_subreddit_link),
+                            'This post was just linked from {0} in a *possible* attempt to downvote it.'
+                            .format(brigade_subreddit_link)
                             ]
 
             lines = ['#**{0}**:\n'.format(choice(greetings)),
