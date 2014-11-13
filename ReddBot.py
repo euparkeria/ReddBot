@@ -384,7 +384,7 @@ class WatchedTreads:
 
         WatchedTreads.watched_threads_list.append(self)
 
-        self.draw_graph()
+        self.draw_graph(targeted_username=self.parent_post_author)
         self.savecache()
 
     def draw_graph(self, targeted_username):
@@ -666,7 +666,6 @@ class ReddBot:
         debug('Maintenance loop')
         maint_timer = time.time()
         avg_subs_per_sec = self.permcounters['submissions'] / (time.time() - start_time)
-        debug('avg_subs_per_sec {}'.format(avg_subs_per_sec))
 
         for function in self._maintenance_functions():
             function()
