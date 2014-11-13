@@ -384,10 +384,10 @@ class WatchedTreads:
 
         WatchedTreads.watched_threads_list.append(self)
 
-        self.draw_graph(targeted_username=self.parent_post_author)
+        self.draw_graph()
         self.savecache()
 
-    def draw_graph(self, targeted_username):
+    def draw_graph(self):
         filename = '{}.png'.format(self.bot_reply_object_id)
 
         p = ggplot(aes(x='Min', y='Score'), data=self.GraphData, ) +\
@@ -395,7 +395,7 @@ class WatchedTreads:
             geom_line(colour="pink") +\
             theme_seaborn(context='paper') +\
             stat_smooth(colour='magenta') +\
-            scale_y_continuous("{}'s post Karma".format(targeted_username)) +\
+            scale_y_continuous("{}'s post Karma".format(self.parent_post_author)) +\
             scale_x_continuous("Minutes since the brigade began") +\
             labs(title="Brigade Effect Graph") +\
             xlim(0)
@@ -491,7 +491,7 @@ class WatchedTreads:
     def update_graph(self):
         self.GraphData.loc[len(self.GraphData)] = [(time.time() - self.start_watch_time)/60,
                                                    self.last_parent_post_score]
-        graph_image_name = self.draw_graph(reddit_operations.get_post_attribute(self.thread_url, attribute='author'))
+        graph_image_name = self.draw_graph()
 
         imgurl_image = reddit_operations.upload_image(graph_image_name)
         if imgurl_image:
