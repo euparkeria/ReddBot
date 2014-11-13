@@ -621,7 +621,7 @@ class MatchedSubmissions:
             lines = ['#**{0}**:\n'.format(choice(greetings)),
                      '{0}\n\n'.format(choice(explanations)),
                      '**{0}**\n\n'.format(choice(their_title)),
-                     '* *{0}*\n\n'.format(self.args['dsubmission'].title),
+                     '* *[{0}]({1})*\n\n'.format(self.args['dsubmission'].title, submissionlink),
                      '**{0}**\n\n'.format(choice(members_active)),
                      '-- [*Waiting for Karma Graph*]^*beta* --\n\n'
                      '\n\n-----\n',
