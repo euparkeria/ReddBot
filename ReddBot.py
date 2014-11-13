@@ -259,7 +259,10 @@ class RedditOperations:
 
     @staticmethod
     def submission_or_comment(url):
-        """Returns True if url is Comment and False if Submission"""
+        """Returns True if url is Comment and False if Submission
+        redo with hasattr
+        """
+        """"""
         result_url = [x for x in url.split('/') if len(x)]
         if len(result_url) == 7:
             return False
