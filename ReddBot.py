@@ -240,25 +240,26 @@ class RedditOperations:
         except praw.errors.APIException:
             log_this('ERROR: Cant login to Reddit.com')
 
-    def get_post_score(self, url):
-        score = None
+    def get_post_attribute(self, url, attribute):
+        value = None
         try:
             post = self.socmedia.reddit_session.get_submission(url=url)
             is_comment = reddit_operations.submission_or_comment(url)
             if is_comment:
-                score = post.comments[0].score
+                value = getattr(post.comments[0], attribute)
             elif not is_comment:
-                score = post.score
+                value = getattr(post, attribute)
         except (APIException,
                 ClientException,
                 praw.requests.exceptions.HTTPError,
                 praw.requests.exceptions.ConnectionError):
             debug("Error: Couldnt get post score")
-        return score
+        debug("NB {}".format(value))
+        return value
 
     @staticmethod
     def submission_or_comment(url):
-        """Returns True if Comment and False if Submission"""
+        """Returns True if url is Comment and False if Submission"""
         result_url = [x for x in url.split('/') if len(x)]
         if len(result_url) == 7:
             return False
@@ -376,7 +377,9 @@ class WatchedTreads:
         self.keep_alive = 43200  # time to watch a thread in seconds
         self.graph_image_link = ''
         self.last_parent_post_score = None
-        self.GraphData = DataFrame(data=[(0, reddit_operations.get_post_score(url=self.thread_url))],
+        self.parent_post_author = reddit_operations.get_post_attribute(url=self.thread_url, attribute='author')
+        self.GraphData = DataFrame(data=[(0, reddit_operations.get_post_attribute(url=self.thread_url,
+                                                                                  attribute='score'))],
                                    columns=['Min', 'Score'])
 
         WatchedTreads.watched_threads_list.append(self)
@@ -384,7 +387,7 @@ class WatchedTreads:
         self.draw_graph()
         self.savecache()
 
-    def draw_graph(self):
+    def draw_graph(self, targeted_username):
         filename = '{}.png'.format(self.bot_reply_object_id)
 
         p = ggplot(aes(x='Min', y='Score'), data=self.GraphData, ) +\
@@ -392,8 +395,8 @@ class WatchedTreads:
             geom_line(colour="pink") +\
             theme_seaborn(context='paper') +\
             stat_smooth(colour='magenta') +\
-            scale_y_continuous("Targeted post Karma") +\
-            scale_x_continuous("Minutes since brigade began") +\
+            scale_y_continuous("{}'s post Karma".format(targeted_username)) +\
+            scale_x_continuous("Minutes since the brigade began") +\
             labs(title="Brigade Effect Graph") +\
             xlim(0)
 
@@ -449,7 +452,7 @@ class WatchedTreads:
             self.bot_body = self.add_user_lines(srs_users=new_invaders_list)
             bot_comment_changed = True
 
-        current_parent_post_score = reddit_operations.get_post_score(url=self.thread_url)
+        current_parent_post_score = reddit_operations.get_post_attribute(url=self.thread_url, attribute='score')
 
         if self.last_parent_post_score is not current_parent_post_score:
             self.last_parent_post_score = current_parent_post_score
@@ -488,7 +491,7 @@ class WatchedTreads:
     def update_graph(self):
         self.GraphData.loc[len(self.GraphData)] = [(time.time() - self.start_watch_time)/60,
                                                    self.last_parent_post_score]
-        graph_image_name = self.draw_graph()
+        graph_image_name = self.draw_graph(reddit_operations.get_post_attribute(self.thread_url, attribute='author'))
 
         imgurl_image = reddit_operations.upload_image(graph_image_name)
         if imgurl_image:
