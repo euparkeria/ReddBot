@@ -241,6 +241,7 @@ class RedditOperations:
             log_this('ERROR: Cant login to Reddit.com')
 
     def get_post_attribute(self, url, attribute):
+        """returns a post attribute as a string"""
         value = None
         try:
             post = self.socmedia.reddit_session.get_submission(url=url)
@@ -255,7 +256,7 @@ class RedditOperations:
                 praw.requests.exceptions.ConnectionError):
             debug("Error: Couldnt get post score")
         debug("NB {}".format(value))
-        return value
+        return str(value)
 
     @staticmethod
     def submission_or_comment(url):
@@ -500,7 +501,7 @@ class WatchedTreads:
         if imgurl_image:
             self.graph_image_link = imgurl_image['link']
 
-            self.bot_body = re.sub('-- \[(.*)]\^\*beta\* --', '-- [[Karma Graph]({})]^*beta* --'
+            self.bot_body = re.sub('-- \[(.*)] --', '-- [[Karma Graph]({})] --'
                                    .format(self.graph_image_link), self.bot_body)
 
     @staticmethod
@@ -618,7 +619,7 @@ class MatchedSubmissions:
                      '**{0}**\n\n'.format(choice(their_title)),
                      '* *[{0}]({1})*\n\n'.format(self.args['dsubmission'].title, submissionlink),
                      '**{0}**\n\n'.format(choice(members_active)),
-                     '-- [*Waiting for Karma Graph*]^*beta* --\n\n'
+                     '-- [*Waiting for Karma Graph*] --\n\n'
                      '\n\n-----\n',
                      '^{1} *{0}* ^{1}\n\n'.format(quote, choice(stars)),
                      ]
