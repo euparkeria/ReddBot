@@ -78,11 +78,10 @@ class SrsUser(Base):
 
 
 class MaintThread(threading.Thread):
-    def __init__(self, threadid, name, counter):
+    def __init__(self, threadid, name):
         threading.Thread.__init__(self)
         self.threadID = threadid
         self.name = name
-        self.counter = counter
 
     def run(self):
         print("Starting " + self.name)
@@ -680,10 +679,10 @@ class ReddBot:
     def _maintenance_loop(self):
         maint_thread_name = "Maintenance Thread"
         if self.first_run:
-            self.mthread = MaintThread(1, maint_thread_name, 1)
+            self.mthread = MaintThread(1, maint_thread_name)
 
         if not self.mthread.isAlive():
-                self.mthread = MaintThread(1, maint_thread_name, 1)
+                self.mthread = MaintThread(1, maint_thread_name)
                 self.mthread.start()
 
     def _mainlooper(self):
