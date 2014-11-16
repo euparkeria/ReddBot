@@ -380,10 +380,9 @@ class WatchedTreads:
         self.poster_username = poster_username
         self.keep_alive = 43200  # time to watch a thread in seconds
         self.graph_image_link = ''
-        self.last_parent_post_score = None
+        self.last_parent_post_score = reddit_operations.get_post_attribute(url=self.thread_url, attribute='score')
         self.parent_post_author = reddit_operations.get_post_attribute(url=self.thread_url, attribute='author')
-        self.GraphData = DataFrame(data=[(0, reddit_operations.get_post_attribute(url=self.thread_url,
-                                                                                  attribute='score'))],
+        self.GraphData = DataFrame(data=[(0, self.last_parent_post_score)],
                                    columns=['Min', 'Score'])
 
         WatchedTreads.watched_threads_list.append(self)
@@ -457,7 +456,6 @@ class WatchedTreads:
             bot_comment_changed = True
 
         current_parent_post_score = reddit_operations.get_post_attribute(url=self.thread_url, attribute='score')
-
         if self.last_parent_post_score is not current_parent_post_score:
             self.last_parent_post_score = current_parent_post_score
             self.update_graph()
