@@ -1,3 +1,4 @@
+import threading
 import time
 from imgurpython.helpers.error import ImgurClientRateLimitError, ImgurClientError
 import praw
@@ -20,7 +21,7 @@ from imgurpython import ImgurClient
 
 
 watched_subreddit = "+".join(['all'])
-results_limit = 1000
+results_limit = 2000
 results_limit_comm = 900
 bot_agent_name = 'antibrigadebot 2.0 /u/antibrigadebot2'
 loop_timer = 60
@@ -74,6 +75,19 @@ class SrsUser(Base):
     last_check_date = Column(String)
     SRS_karma_balance = Column(Integer)
     invasion_number = Column(Integer)
+
+
+class MaintThread(threading.Thread):
+    def __init__(self, threadid, name, counter):
+        threading.Thread.__init__(self)
+        self.threadID = threadid
+        self.name = name
+        self.counter = counter
+
+    def run(self):
+        print("Starting " + self.name)
+        botconfig.check_for_updated_config()
+        WatchedTreads.update_all()
 
 
 class SocialMedia:
@@ -523,7 +537,6 @@ class WatchedTreads:
                 return True
 
 
-
 class MatchedSubmissions:
 
     matching_results = []
@@ -654,6 +667,7 @@ class ReddBot:
         self.permcounters = {'comments': 0, 'submissions': 0}
         self.twitter = None
         self.placeholder_id = None  # this doesn't always work !? but it will lower the traffic to some extent
+        self.mthread = MaintThread(1, "Maintenance Thread", 1)
 
         loop_counter = 0
         while True:
@@ -666,28 +680,9 @@ class ReddBot:
 
     def _maintenance_loop(self):
         debug('Maintenance loop')
-        maint_timer = time.time()
-        avg_subs_per_sec = self.permcounters['submissions'] / (time.time() - start_time)
-
-        for function in self._maintenance_functions():
-            function()
-
-        maint_timer = time.time() - maint_timer
-        debug('maint_seconds {}'.format(maint_timer))
-
-        increase_pulllimit_by = int((maint_timer * avg_subs_per_sec) + 1)
-        self.pulllimit['submissions'] += increase_pulllimit_by
-        debug('Pulllimit increased by:{}'.format(increase_pulllimit_by))
-
-    @staticmethod
-    def _maintenance_functions():
-        def watchthreads():
-            WatchedTreads.update_all()
-
-        def reloadconfig():
-            botconfig.check_for_updated_config()
-
-        return [watchthreads, reloadconfig]
+        if not self.mthread.isAlive():
+                self.mthread = MaintThread(1, "Maintenance Thread", 1)
+                self.mthread.start()
 
     def _mainlooper(self):
 
