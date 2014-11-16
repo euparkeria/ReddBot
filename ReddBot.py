@@ -269,7 +269,6 @@ class RedditOperations:
                 praw.requests.exceptions.HTTPError,
                 praw.requests.exceptions.ConnectionError):
             debug("Error: Couldnt get post score")
-        debug("NB {}".format(value))
         return str(value)
 
     @staticmethod
@@ -701,9 +700,9 @@ class ReddBot:
                 self.pulllimit[loop] = self._calculate_pull_limit(self.cont_num[loop], target=loop)
             self.permcounters[loop] += self.cont_num[loop]
 
-        debug('{0}th sec. Sub so far:{1},THIS run:{2}.'
-              'Comments so far:{3},THIS run:{4}'
-              .format(int((time.time() - start_time)), self.permcounters['submissions'],
+        debug('Sub:{0}, this run:{1}.'
+              'Comments:{2}, this run:{3}'
+              .format(self.permcounters['submissions'],
                       self.cont_num['submissions'], self.permcounters['comments'],
                       self.cont_num['comments']))
 
