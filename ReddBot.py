@@ -667,7 +667,7 @@ class ReddBot:
         self.permcounters = {'comments': 0, 'submissions': 0}
         self.twitter = None
         self.placeholder_id = None  # this doesn't always work !? but it will lower the traffic to some extent
-        self.mthread = MaintThread(1, "Maintenance Thread", 1)
+        self.mthread = None
 
         loop_counter = 0
         while True:
@@ -679,9 +679,12 @@ class ReddBot:
             self._mainlooper()
 
     def _maintenance_loop(self):
-        debug('Maintenance loop')
+        maint_thread_name = "Maintenance Thread"
+        if self.first_run:
+            self.mthread = MaintThread(1, maint_thread_name, 1)
+
         if not self.mthread.isAlive():
-                self.mthread = MaintThread(1, "Maintenance Thread", 1)
+                self.mthread = MaintThread(1, maint_thread_name, 1)
                 self.mthread.start()
 
     def _mainlooper(self):
