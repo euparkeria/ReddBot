@@ -6,7 +6,6 @@ import json
 import os
 import pickle
 import re
-from ggplot import *
 from pandas import DataFrame
 from random import choice
 from praw.errors import APIException, ClientException
@@ -399,9 +398,9 @@ class WatchedTreads:
 
         WatchedTreads.watched_threads_list.append(self)
 
-        self.draw_graph()
+        #self.draw_graph()
         self.savecache()
-
+    """
     def draw_graph(self):
         filename = '{}.png'.format(self.bot_reply_object_id)
 
@@ -417,7 +416,7 @@ class WatchedTreads:
 
         ggsave(p, filename, width=8, height=5, dpi=100, scale=1)
         return filename
-
+        """
     @staticmethod
     def savecache():
         try:
@@ -468,10 +467,12 @@ class WatchedTreads:
             bot_comment_changed = True
 
         current_parent_post_score = reddit_operations.get_post_attribute(url=self.thread_url, attribute='score')
+        '''
         if self.last_parent_post_score is not current_parent_post_score:
             self.last_parent_post_score = current_parent_post_score
             self.update_graph()
             bot_comment_changed = True
+        '''
 
         if bot_comment_changed:
             reddit_operations.edit_comment(comment_id=self.bot_reply_object_id,
@@ -502,6 +503,7 @@ class WatchedTreads:
                 self.already_processed_users.append(author)
         return srs_users
 
+    '''
     def update_graph(self):
         self.GraphData.loc[len(self.GraphData)] = [(time.time() - self.start_watch_time)/60,
                                                    self.last_parent_post_score]
@@ -513,6 +515,7 @@ class WatchedTreads:
 
             self.bot_body = re.sub('-- \[(.*)] --', '-- [[Karma Graph]({})] --'
                                    .format(self.graph_image_link), self.bot_body)
+    '''
 
     @staticmethod
     def update_all():
@@ -628,7 +631,7 @@ class MatchedSubmissions:
                      '**{0}**\n\n'.format(choice(their_title)),
                      '* *[{0}]({1})*\n\n'.format(self.args['dsubmission'].title, submissionlink),
                      '**{0}**\n\n'.format(choice(members_active)),
-                     '-- [*Waiting for Karma Graph*] --\n\n'
+                     '\n\n'
                      '\n\n-----\n',
                      '^{1} *{0}* ^{1}\n\n'.format(quote, choice(stars)),
                      ]
