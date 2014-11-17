@@ -16,7 +16,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy import Column, Integer, String
 from sqlalchemy.orm import sessionmaker
-from imgurpython import ImgurClient
+#from imgurpython import ImgurClient
 
 
 watched_subreddit = "+".join(['all'])
@@ -92,7 +92,7 @@ class SocialMedia:
     def __init__(self):
         self.reddit_session = self.connect_to_reddit()
         self.twitter_session = self.connect_to_twitter()
-        self.imgur_client = self.connect_to_imgur()
+        #self.imgur_client = self.connect_to_imgur()
 
     @staticmethod
     def connect_to_reddit():
@@ -109,13 +109,13 @@ class SocialMedia:
         except TwythonError:
             log_this('ERROR: Cant authenticate into twitter')
         return t
-
+    '''
     @staticmethod
     def connect_to_imgur():
         imgur_client = ImgurClient(botconfig.bot_auth_info['IMGUR_CLIENT_ID'],
                                    botconfig.bot_auth_info['IMGUR_CLIENT_SECRET'])
         return imgur_client
-
+    '''
 
 class ConfigFiles:
     def __init__(self):
@@ -525,7 +525,7 @@ class WatchedTreads:
             WatchedTreads.savecache()
 
     def add_user_lines(self, srs_users):
-        split_mark = '\n\n-- ['
+        split_mark = '\n\n-----\n'
         splitted_comment = self.bot_body.split(split_mark, 1)
         srs_users_lines = ''.join(['\n\n* [/u/' + user + '](http://np.reddit.com/u/' + user + ')\n\n'for user in srs_users])
         return splitted_comment[0] + srs_users_lines + split_mark + splitted_comment[1]
@@ -610,26 +610,20 @@ class MatchedSubmissions:
             submissionlink = reddit_operations.make_np(self.args['dsubmission'].permalink)
             brigade_subreddit_link = '*[/r/{0}]({1})*'.format(self.args['dsubmission'].subreddit, submissionlink)
 
-            greetings = ['Notice']
-
             updated_on = '^updated ^every ^5 ^minutes ^for ^12 ^hours.'
 
             members_active = ['Members of {0} active in this thread:{1}'.format(brigade_subreddit_link, updated_on)]
 
             stars = ['★', '☭']
 
-            their_title = ['Title:']
-
-            explanations = ['This thread has been targeted by a *possible* downvote-brigade from {0}'
+            explanations = ['This thread has been targeted by a *possible* downvote-brigade from **{0}**'
                             .format(brigade_subreddit_link),
-                            'This post was just linked from {0} in a *possible* attempt to downvote it.'
+                            'This post was just linked from **{0}** in a *possible* attempt to downvote it.'
                             .format(brigade_subreddit_link)
                             ]
 
-            lines = ['#**{0}**:\n'.format(choice(greetings)),
-                     '{0}\n\n'.format(choice(explanations)),
-                     '**{0}**\n\n'.format(choice(their_title)),
-                     '* *[{0}]({1})*\n\n'.format(self.args['dsubmission'].title, submissionlink),
+            lines = ['#{0}\n\n'.format(choice(explanations)),
+                     '* **[{0}]({1})**\n\n'.format(self.args['dsubmission'].title, submissionlink),
                      '**{0}**\n\n'.format(choice(members_active)),
                      '\n\n'
                      '\n\n-----\n',
