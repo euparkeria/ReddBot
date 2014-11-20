@@ -117,6 +117,7 @@ class SocialMedia:
         return imgur_client
     '''
 
+
 class ConfigFiles:
     def __init__(self):
         self.data_modified_time = 0
