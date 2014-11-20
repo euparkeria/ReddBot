@@ -611,9 +611,7 @@ class MatchedSubmissions:
             submissionlink = reddit_operations.make_np(self.args['dsubmission'].permalink)
             brigade_subreddit_link = '*[/r/{0}]({1})*'.format(self.args['dsubmission'].subreddit, submissionlink)
 
-            updated_on = '^updated ^every ^5 ^minutes ^for ^12 ^hours.'
-
-            members_active = ['Members of {0} active in this thread:{1}'.format(brigade_subreddit_link, updated_on)]
+            members_active = ['Members of {0} active in this thread:'.format(brigade_subreddit_link)]
 
             stars = ['★', '☭']
 
@@ -624,7 +622,7 @@ class MatchedSubmissions:
                             ]
 
             lines = ['#{0}\n\n'.format(choice(explanations)),
-                     '* **[{0}]({1})**\n\n'.format(self.args['dsubmission'].title, submissionlink),
+                     '* *[{0}]({1})*\n\n'.format(self.args['dsubmission'].title, submissionlink),
                      '**{0}**\n\n'.format(choice(members_active)),
                      '\n\n'
                      '\n\n-----\n',
