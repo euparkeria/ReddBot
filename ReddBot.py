@@ -1,6 +1,6 @@
 import threading
 import time
-from imgurpython.helpers.error import ImgurClientRateLimitError, ImgurClientError
+#from imgurpython.helpers.error import ImgurClientRateLimitError, ImgurClientError
 import praw
 import json
 import os
