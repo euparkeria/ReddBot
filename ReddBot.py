@@ -6,7 +6,7 @@ import json
 import os
 import pickle
 import re
-from pandas import DataFrame
+#from pandas import DataFrame
 from random import choice
 from praw.errors import APIException, ClientException
 from requests import exceptions
@@ -394,8 +394,7 @@ class WatchedTreads:
         self.graph_image_link = ''
         self.last_parent_post_score = reddit_operations.get_post_attribute(url=self.thread_url, attribute='score')
         self.parent_post_author = reddit_operations.get_post_attribute(url=self.thread_url, attribute='author')
-        self.GraphData = DataFrame(data=[(0, self.last_parent_post_score)],
-                                   columns=['Min', 'Score'])
+        #self.GraphData = DataFrame(data=[(0, self.last_parent_post_score)], columns=['Min', 'Score'])
 
         WatchedTreads.watched_threads_list.append(self)
 
