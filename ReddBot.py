@@ -54,7 +54,7 @@ class UsernameBank:
             self.already_tried.append(new_random_username)
             return new_random_username
         else:
-            return self.defaut_username
+            return False
 
     def purge_tried_list(self):
         self.already_tried = []
@@ -77,6 +77,8 @@ class SrsUser(Base):
 
 
 class MaintThread(threading.Thread):
+    """separate thread for the maintanance functions"""
+
     def __init__(self, threadid, name):
         threading.Thread.__init__(self)
         self.threadID = threadid
@@ -84,11 +86,13 @@ class MaintThread(threading.Thread):
 
     def run(self):
         print("Starting " + self.name)
+        '''Maintanence functions bellow'''
         botconfig.check_for_updated_config()
         WatchedTreads.update_all()
 
 
 class SocialMedia:
+    """handles reddit and twiter API init and sessions"""
     def __init__(self):
         self.reddit_session = self.connect_to_reddit()
         self.twitter_session = self.connect_to_twitter()
@@ -232,8 +236,10 @@ class RedditOperations:
     """Contains reddit, twitter and imgur api related operations"""
 
     def __init__(self):
+        """class SocialMedia should only be needed within this class so init here"""
         self.socmedia = SocialMedia()
 
+    '''
     def upload_image(self, image_path):
         try:
             image_object = self.socmedia.imgur_client.upload_from_path(path=image_path)
@@ -241,11 +247,11 @@ class RedditOperations:
             debug('ERROR: Imgur Rate Limit Exceeded')
             return False
         return image_object
-
+    '''
     def login(self, username=''):
         try:
             if not username:
-                username = username_bank.get_username()
+                username = username_bank.defaut_username
             self.socmedia.reddit_session.login(username, botconfig.bot_auth_info['REDDIT_BOT_PASSWORD'])
             username_bank.reddit_username = username
             debug('Sucessfully logged in as {0}'.format(username_bank.reddit_username))
@@ -258,29 +264,36 @@ class RedditOperations:
         value = None
         try:
             post = self.socmedia.reddit_session.get_submission(url=url)
-            is_comment = reddit_operations.submission_or_comment(url)
-            if is_comment:
-                value = getattr(post.comments[0], attribute)
-            elif not is_comment:
-                value = getattr(post, attribute)
-        except (APIException,
+            post_object = reddit_operations.get_post_object(url)
+            value = getattr(post_object, attribute)
+
+        except (AttributeError,
+                APIException,
                 ClientException,
                 praw.requests.exceptions.HTTPError,
                 praw.requests.exceptions.ConnectionError):
             debug("Error: Couldnt get post score")
         return str(value)
 
-    @staticmethod
-    def submission_or_comment(url):
+    def get_post_object(self, url):
         """Returns True if url is Comment and False if Submission
         redo with hasattr
         """
         """"""
+        post_object = self.socmedia.reddit_session.get_submission(url=url)
+
+        if len(post_object.comments) > 1:
+            return post_object
+        else:
+            return post_object.comments[0]
+
+        '''
         result_url = [x for x in url.split('/') if len(x)]
         if len(result_url) == 7:
             return False
         elif len(result_url) == 8:
             return True
+        '''
 
     def get_user_karma_balance(self, author, in_subreddit, user_comments_limit=200):
         user_srs_karma_balance = 0
@@ -327,27 +340,29 @@ class RedditOperations:
         if target == 'comments':
             return self.socmedia.reddit_session.get_comments(subreddit, limit=limit)
 
-    def comment_to_url(self, obj, msg, result_url):
+    def reply_to_url(self, msg, result_url):
         """hacky"""
-        is_comment = reddit_operations.submission_or_comment(result_url)
+        post_object = reddit_operations.get_post_object(result_url)
         return_obj = None
         retry_attemts = username_bank.username_count
         username_bank.prev_username = username_bank.reddit_username
 
         for retry in range(retry_attemts):
             try:
-                if not is_comment:
-                    return_obj = obj.add_comment(msg)
-                    debug('NOTICE ADDED to ID:{0}'.format(obj.id))
+                if hasattr(post_object, 'body'):
+                    return_obj = post_object.reply(msg)
+                    debug('NOTICE REPLIED to ID:{0}'.format(post_object.id))
                     break
-                elif is_comment:
-                    return_obj = obj.comments[0].reply(msg)
-                    debug('NOTICE REPLIED to ID:{0}'.format(obj.comments[0].id))
+                else:
+                    return_obj = post_object.add_comment(msg)
+                    debug('NOTICE ADDED to ID:{0}'.format(post_object.id))
+
                     break
             except (praw.errors.APIException,
                     praw.requests.exceptions.HTTPError,
                     praw.requests.exceptions.ConnectionError):
-                log_this('{1} is BANNED in:{0}, trying to relog'.format(obj.subreddit, username_bank.reddit_username))
+                log_this('{1} is BANNED in:{0}, trying to relog'.format(post_object.subreddit,
+                                                                        username_bank.reddit_username))
                 self.login()
 
         username_bank.prev_username_login()
@@ -767,9 +782,8 @@ class ReddBot:
                                 already_watched = True
                         if not already_watched:
                             try:
-                                reply = reddit_operations.comment_to_url(obj=targeted_submission,
-                                                                         msg=result.msg_for_reply,
-                                                                         result_url=result.url)
+                                reply = reddit_operations.reply_to_url(msg=result.msg_for_reply,
+                                                                       result_url=result.url)
                                 WatchedTreads(thread_url=result.url,
                                               srs_subreddit=str(result.args['dsubmission'].subreddit),
                                               srs_author=str(result.args['dsubmission'].author),
