@@ -251,7 +251,7 @@ class RedditOperations:
     def login(self, username=''):
         try:
             if not username:
-                username = username_bank.defaut_username
+                username = username_bank.get_username()
             self.socmedia.reddit_session.login(username, botconfig.bot_auth_info['REDDIT_BOT_PASSWORD'])
             username_bank.reddit_username = username
             debug('Sucessfully logged in as {0}'.format(username_bank.reddit_username))
@@ -276,24 +276,16 @@ class RedditOperations:
         return str(value)
 
     def get_post_object(self, url):
-        """Returns True if url is Comment and False if Submission
-        redo with hasattr
+        """
+        returns correct object for reply depending on url, comment or submission
         """
         """"""
         post_object = self.socmedia.reddit_session.get_submission(url=url)
-
-        if len(post_object.comments) > 1:
-            return post_object
-        else:
-            return post_object.comments[0]
-
-        '''
         result_url = [x for x in url.split('/') if len(x)]
         if len(result_url) == 7:
-            return False
+            return post_object
         elif len(result_url) == 8:
-            return True
-        '''
+            return post_object.comments[0]
 
     def get_user_karma_balance(self, author, in_subreddit, user_comments_limit=200):
         user_srs_karma_balance = 0
@@ -341,7 +333,7 @@ class RedditOperations:
             return self.socmedia.reddit_session.get_comments(subreddit, limit=limit)
 
     def reply_to_url(self, msg, result_url):
-        """hacky"""
+        """only comment object have the 'body' attribute"""
         post_object = reddit_operations.get_post_object(result_url)
         return_obj = None
         retry_attemts = username_bank.username_count
@@ -778,6 +770,7 @@ class ReddBot:
                 if targeted_submission:
                         already_watched = False
                         for thread in WatchedTreads.watched_threads_list:
+
                             if thread.thread_url in result.url:
                                 already_watched = True
                         if not already_watched:
