@@ -438,10 +438,12 @@ class WatchedTreads:
     def update_user_database(username, subreddit, srs_karma):
         session = DBSession()
         users_query = WatchedTreads.query_user_database(username, subreddit)
+        invasion_number = 0
 
         if users_query:
             if users_query.invasion_number:
                 users_query.invasion_number += 1
+                invasion_number = users_query.invasion_number
             else:
                 users_query.invasion_number = 1
             users_query.last_check_date = time.time()
@@ -457,14 +459,14 @@ class WatchedTreads:
 
         session.commit()
         debug('Database Updated')
-        return users_query
+        return invasion_number
 
     @staticmethod
     def query_user_database(username, subreddit):
         """Will return False if user doesnt exist"""
         session = DBSession()
-        users_query = session.query(SrsUser).filter_by(username=username, subreddit=subreddit)
-        if users_query.count():
+        users_query = session.query(SrsUser).filter_by(username=username, subreddit=subreddit).first()
+        if users_query:
             return users_query
         else:
             return False
@@ -507,15 +509,15 @@ class WatchedTreads:
 
                 if user_srs_karma_balance >= karma_upper_limit:
                     srs_users.append({'username': author, 'tag': '', 'karma': user_srs_karma_balance})
-                    users_query = WatchedTreads.update_user_database(username=author,
-                                                                     subreddit=self.srs_subreddit,
-                                                                     srs_karma=user_srs_karma_balance)
-                    if users_query.invasion_number >= 10:
+                    invasion_number = WatchedTreads.update_user_database(username=author,
+                                                                         subreddit=self.srs_subreddit,
+                                                                         srs_karma=user_srs_karma_balance)
+                    if invasion_number >= 5:
                         srs_users[-1]['tag'] = '☠'
 
                 self.already_processed_users.append(author)
         debug('Processed {0} new users for thread: {1} User LIST:'.format(new_user_counter, self.thread_url))
-        debug(srs_users)
+        print([user['username'] + ':' + user['karma'] for user in srs_users])
         return srs_users
 
     '''
@@ -815,9 +817,9 @@ def log_this(logtext):
     debug('Sent to LOG FILE: {}'.format(logtext))
 
 
-def debug(debugtext, level=DEBUG_LEVEL, end='\n'):
+def debug(debugtext, level=DEBUG_LEVEL):
     if level >= 1:
-        print('* {}'.format(debugtext), end=end)
+        print('* {}'.format(debugtext))
 
 
 start_time = time.time()
