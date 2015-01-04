@@ -263,8 +263,7 @@ class RedditOperations:
         """returns a post attribute as a string"""
         value = None
         try:
-            post = self.socmedia.reddit_session.get_submission(url=url)
-            post_object = reddit_operations.get_post_object(url)
+            post_object = self.get_post_object(url)
             value = getattr(post_object, attribute)
 
         except (AttributeError,
@@ -277,17 +276,17 @@ class RedditOperations:
 
     def get_post_object(self, url):
         """
-        returns correct object for reply depending on url, comment or submission
+        returns correct object type for reply depending on url, comment or submission
         """
         """"""
-        post_object = self.socmedia.reddit_session.get_submission(url=url)
+        post_object = self.get_submission_by_url(url=url)
         result_url = [x for x in url.split('/') if len(x)]
         if len(result_url) == 7:
             return post_object
         elif len(result_url) == 8:
             return post_object.comments[0]
 
-    def get_user_karma_balance(self, author, in_subreddit, user_comments_limit=200):
+    def get_user_karma_balance(self, author, in_subreddit, user_comments_limit=500):
         user_srs_karma_balance = 0
 
         try:
@@ -295,14 +294,15 @@ class RedditOperations:
             for usercomment in user.get_overview(limit=user_comments_limit):
                 if str(usercomment.subreddit) == in_subreddit:
                     user_srs_karma_balance += usercomment.score
-        except (APIException, ClientException):
+        except (APIException,
+                ClientException):
             log_this('ERROR: Cant get user SRS karma balance!!')
         return user_srs_karma_balance
 
-    def get_authors_in_thread(self, thread):
+    def get_authors_in_thread(self, url):
         authors_list = []
         try:
-            submission = self.socmedia.reddit_session.get_submission(thread)
+            submission = self.get_submission_by_url(url)
             submission.replace_more_comments(limit=4, threshold=1)
             for comment in praw.helpers.flatten_tree(submission.comments):
                 author = str(comment.author)
@@ -443,7 +443,7 @@ class WatchedTreads:
                                  SRS_karma_balance=srs_karma)
             session.add(stupiduser)
 
-            debug("{} Added to database!".format(username))
+            debug("{0}@{1} Added to database!".format(subreddit, username))
         else:
             users_query = session.query(SrsUser).filter_by(username=username, subreddit=subreddit).first()
             if users_query.invasion_number:
@@ -452,7 +452,7 @@ class WatchedTreads:
                 users_query.invasion_number = 1
             users_query.last_check_date = time.time()
             users_query.SRS_karma_balance = srs_karma
-            debug("Updated database entry on: {0} !".format(username))
+            debug("Updated database entry on: {0}@{1} !".format(subreddit, username))
         session.commit()
 
     @staticmethod
@@ -487,28 +487,29 @@ class WatchedTreads:
                                            poster_username=self.poster_username)
 
         if self.check_if_expired():
-            debug('--Watched Thread Expired and Removed!')
+            debug('This Thread has Expired and is Removed! {0} '.format(self.thread_url))
 
     def check_for_new_invaders(self):
-        karma_upper_limit = 3  # if poster has more than that amount of karma in the srs subreddit he is added
-        srs_users = []
-        debug('Now processing: {}'.format(self.thread_url))
+        karma_upper_limit = 5  # if poster has more than that amount of karma in the srs subreddit he is added
+        srs_users = {}
+        new_user_counter = 0
 
-        for author in reddit_operations.get_authors_in_thread(thread=self.thread_url):
+        for author in reddit_operations.get_authors_in_thread(url=self.thread_url):
             if author not in self.already_processed_users:
-                debug('--Checking user: {}'.format(author), end=" ")
+                new_user_counter += 1
                 user_srs_karma_balance = reddit_operations.get_user_karma_balance(author=author,
                                                                                   in_subreddit=self.srs_subreddit)
-                debug(',/r/{0} karma score:{1} '.format(self.srs_subreddit, user_srs_karma_balance), end=" ")
+
                 if user_srs_karma_balance >= karma_upper_limit:
-                    srs_users.append(author)
+                    srs_users[author] = user_srs_karma_balance
                     WatchedTreads.add_user_to_database(username=author,
                                                        subreddit=self.srs_subreddit,
                                                        srs_karma=user_srs_karma_balance)
-                    debug('MATCH', end=" ")
-                debug('.')
+
                 self.already_processed_users.append(author)
-        return srs_users
+        debug('Processed {0} new users for thread: {1} User LIST:'.format(new_user_counter, self.thread_url))
+        debug(srs_users)
+        return [x for x in srs_users.keys()]
 
     '''
     def update_graph(self):
@@ -529,7 +530,7 @@ class WatchedTreads:
         debug('Currently Watching {} threads.'.format(len(WatchedTreads.watched_threads_list)))
         for thread in WatchedTreads.watched_threads_list:
             thread.update()
-            WatchedTreads.savecache()
+        WatchedTreads.savecache()
 
     def add_user_lines(self, srs_users):
         split_mark = '\n\n-----\n'
@@ -539,7 +540,7 @@ class WatchedTreads:
 
     def check_if_expired(self):
             time_watched = time.time() - self.start_watch_time
-            debug('--Watched for {} hours'.format(time_watched/60/60))
+            debug('{0} Watched for {1} hours'.format(self.thread_url, time_watched/60/60))
             if time_watched > self.keep_alive:  # if older than 8 hours
                 WatchedTreads.watched_threads_list.remove(self)
                 return True
@@ -619,7 +620,7 @@ class MatchedSubmissions:
 
             members_active = ['Members of {0} active in this thread:'.format(brigade_subreddit_link)]
 
-            stars = ['★', '☭']
+            stars = ['★']
 
             explanations = ['This thread has been targeted by a *possible* downvote-brigade from **{0}**'
                             .format(brigade_subreddit_link),
