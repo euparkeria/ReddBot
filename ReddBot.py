@@ -435,34 +435,37 @@ class WatchedTreads:
             log_this('ERROR: Cant write cache file')
 
     @staticmethod
-    def add_user_to_database(username, subreddit, srs_karma):
+    def update_user_database(username, subreddit, srs_karma):
         session = DBSession()
+        users_query = WatchedTreads.query_user_database(username, subreddit)
 
-        if not WatchedTreads.check_if_already_in_db(username, subreddit):
-            stupiduser = SrsUser(username=username,
-                                 subreddit=subreddit,
-                                 last_check_date=time.time(),
-                                 SRS_karma_balance=srs_karma)
-            session.add(stupiduser)
-
-            debug("{0}@{1} Added to database!".format(subreddit, username))
-        else:
-            users_query = session.query(SrsUser).filter_by(username=username, subreddit=subreddit).first()
+        if users_query:
             if users_query.invasion_number:
                 users_query.invasion_number += 1
             else:
                 users_query.invasion_number = 1
             users_query.last_check_date = time.time()
             users_query.SRS_karma_balance = srs_karma
-            debug("Updated database entry on: {0}@{1} !".format(subreddit, username))
+            debug("Updating database entry on: {0}@{1} !".format(subreddit, username))
+        else:
+            debug("{0}@{1} NOT IN database!".format(subreddit, username))
+            stupiduser = SrsUser(username=username,
+                                 subreddit=subreddit,
+                                 last_check_date=time.time(),
+                                 SRS_karma_balance=srs_karma)
+            session.add(stupiduser)
+
         session.commit()
+        debug('Database Updated')
+        return users_query
 
     @staticmethod
-    def check_if_already_in_db(username, subreddit):
+    def query_user_database(username, subreddit):
+        """Will return False if user doesnt exist"""
         session = DBSession()
         users_query = session.query(SrsUser).filter_by(username=username, subreddit=subreddit)
         if users_query.count():
-            return True
+            return users_query
         else:
             return False
 
@@ -493,7 +496,7 @@ class WatchedTreads:
 
     def check_for_new_invaders(self):
         karma_upper_limit = 5  # if poster has more than that amount of karma in the srs subreddit he is added
-        srs_users = {}
+        srs_users = []
         new_user_counter = 0
 
         for author in reddit_operations.get_authors_in_thread(url=self.thread_url):
@@ -503,15 +506,17 @@ class WatchedTreads:
                                                                                   in_subreddit=self.srs_subreddit)
 
                 if user_srs_karma_balance >= karma_upper_limit:
-                    srs_users[author] = user_srs_karma_balance
-                    WatchedTreads.add_user_to_database(username=author,
-                                                       subreddit=self.srs_subreddit,
-                                                       srs_karma=user_srs_karma_balance)
+                    srs_users.append({'username': author, 'tag': '', 'karma': user_srs_karma_balance})
+                    users_query = WatchedTreads.update_user_database(username=author,
+                                                                     subreddit=self.srs_subreddit,
+                                                                     srs_karma=user_srs_karma_balance)
+                    if users_query.invasion_number >= 10:
+                        srs_users[-1]['tag'] = '☠'
 
                 self.already_processed_users.append(author)
         debug('Processed {0} new users for thread: {1} User LIST:'.format(new_user_counter, self.thread_url))
         debug(srs_users)
-        return [x for x in srs_users.keys()]
+        return srs_users
 
     '''
     def update_graph(self):
@@ -537,7 +542,13 @@ class WatchedTreads:
     def add_user_lines(self, srs_users):
         split_mark = '\n\n-----\n'
         splitted_comment = self.bot_body.split(split_mark, 1)
-        srs_users_lines = ''.join(['\n\n* [/u/' + user + '](http://np.reddit.com/u/' + user + ')\n\n'for user in srs_users])
+        srs_users_lines = ''.join(['\n\n* [/u/'
+                                   + user['username']
+                                   + '](http://np.reddit.com/u/'
+                                   + user['username']
+                                   + ')'
+                                   + user['tag']
+                                   + '\n\n' for user in srs_users])
         return splitted_comment[0] + srs_users_lines + split_mark + splitted_comment[1]
 
     def check_if_expired(self):
