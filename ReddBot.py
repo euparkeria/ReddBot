@@ -15,7 +15,7 @@ from twython import TwythonError
 from sqlalchemy import create_engine
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy import Column, Integer, String
-from sqlalchemy.orm import sessionmaker
+from sqlalchemy.orm import sessionmaker, scoped_session
 #from imgurpython import ImgurClient
 
 
@@ -32,7 +32,8 @@ DATAFILE = 'ReddDATA.json'
 
 engine = create_engine('sqlite:///ReddDatabase.db')
 Base = declarative_base()
-DBSession = sessionmaker(bind=engine)
+session_factory = sessionmaker(bind=engine)
+Session = scoped_session(session_factory)
 
 
 class UsernameBank:
@@ -436,7 +437,7 @@ class WatchedTreads:
 
     @staticmethod
     def update_user_database(username, subreddit, srs_karma):
-        session = DBSession()
+        session = Session()
         users_query = WatchedTreads.query_user_database(username, subreddit)
         invasion_number = 0
 
@@ -448,9 +449,9 @@ class WatchedTreads:
                 users_query.invasion_number = 1
             users_query.last_check_date = time.time()
             users_query.SRS_karma_balance = srs_karma
-            debug("Updating database entry on: {0}@{1} !".format(subreddit, username))
+            debug("Updating database entry on: {1}@{0} !".format(subreddit, username))
         else:
-            debug("{0}@{1} NOT IN database!".format(subreddit, username))
+            debug("{1}@{0} NOT IN database!".format(subreddit, username))
             stupiduser = SrsUser(username=username,
                                  subreddit=subreddit,
                                  last_check_date=time.time(),
@@ -458,14 +459,16 @@ class WatchedTreads:
             session.add(stupiduser)
 
         session.commit()
+        Session.remove()
         debug('Database Updated')
         return invasion_number
 
     @staticmethod
     def query_user_database(username, subreddit):
         """Will return False if user doesnt exist"""
-        session = DBSession()
+        session = Session()
         users_query = session.query(SrsUser).filter_by(username=username, subreddit=subreddit).first()
+        Session.remove()
         if users_query:
             return users_query
         else:
