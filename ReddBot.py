@@ -303,12 +303,14 @@ class RedditOperations:
         authors_list = []
         try:
             submission = self.get_submission_by_url(url)
-            submission.replace_more_comments(limit=4, threshold=1)
+            submission.replace_more_comments(limit=None, threshold=1)
             for comment in praw.helpers.flatten_tree(submission.comments):
                 author = str(comment.author)
                 if author not in botconfig.bot_auth_info['REDDIT_BOT_USERNAME']:
                     authors_list.append(author)
-        except (APIException, praw.requests.exceptions.HTTPError, praw.requests.exceptions.ConnectionError):
+        except (APIException,
+                praw.requests.exceptions.HTTPError,
+                praw.requests.exceptions.ConnectionError):
             log_this('ERROR:couldnt get all authors from thread')
         return authors_list
 
