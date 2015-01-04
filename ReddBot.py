@@ -712,7 +712,7 @@ class ReddBot:
             buffer_reset_lenght = self.pulllimit[loop] * 10
             if len(self.processed_objects[loop]) >= buffer_reset_lenght:
                 self.processed_objects[loop] = self.processed_objects[loop][int(len(self.processed_objects[loop]) / 2):]
-                debug('Buffers LENGHT after trim {0}'.format(len(self.processed_objects[loop])))
+                # debug('Buffers LENGHT after trim {0}'.format(len(self.processed_objects[loop])))
             if not self.first_run:
                 self.pulllimit[loop] = self._calculate_pull_limit(self.cont_num[loop], target=loop)
             self.permcounters[loop] += self.cont_num[loop]
