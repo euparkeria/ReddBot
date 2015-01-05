@@ -515,12 +515,12 @@ class WatchedTreads:
                     invasion_number = WatchedTreads.update_user_database(username=author,
                                                                          subreddit=self.srs_subreddit,
                                                                          srs_karma=user_srs_karma_balance)
-                    if invasion_number >= 5:
-                        srs_users[-1]['tag'] = '☠'
+                    if invasion_number:
+                        srs_users[-1]['tag'] = int(round((invasion_number/7))) * '☠'
 
                 self.already_processed_users.append(author)
         debug('Processed {0} new users for thread: {1} User LIST:'.format(new_user_counter, self.thread_url))
-        print([user['username'] + ':' + user['karma'] for user in srs_users])
+        print([user['username'] + ':' + str(user['karma']) for user in srs_users])
         return srs_users
 
     '''
