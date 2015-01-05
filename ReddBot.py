@@ -296,7 +296,9 @@ class RedditOperations:
                 if str(usercomment.subreddit) == in_subreddit:
                     user_srs_karma_balance += usercomment.score
         except (APIException,
-                ClientException):
+                ClientException,
+                praw.requests.exceptions.HTTPError,
+                praw.requests.exceptions.ConnectionError):
             log_this('ERROR: Cant get user SRS karma balance!!')
         return user_srs_karma_balance
 
