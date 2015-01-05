@@ -326,7 +326,9 @@ class RedditOperations:
             comment.edit(comment_body)
             debug('Comment : {} edited.'.format(comment_id))
             username_bank.prev_username_login()
-        except (APIException, praw.requests.exceptions.HTTPError, praw.requests.exceptions.ConnectionError):
+        except (APIException,
+                praw.requests.exceptions.HTTPError,
+                praw.requests.exceptions.ConnectionError):
             log_this('ERROR: Cant edit comment')
 
     def get_comments_or_subs(self, placeholder_id='', subreddit=watched_subreddit,
@@ -355,7 +357,7 @@ class RedditOperations:
                     debug('NOTICE ADDED to ID:{0}'.format(post_object.id))
 
                     break
-            except (praw.errors.APIException,
+            except (APIException,
                     praw.requests.exceptions.HTTPError,
                     praw.requests.exceptions.ConnectionError):
                 log_this('{1} is BANNED in:{0}, trying to relog'.format(post_object.subreddit,
