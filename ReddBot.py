@@ -56,7 +56,7 @@ class UsernameBank:
             self.already_tried.append(new_name)
             return new_name
         else:
-            return False
+            return self.defaut_username
 
     def purge_tried_list(self):
         self.already_tried = []
