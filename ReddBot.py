@@ -79,7 +79,7 @@ class SrsUser(Base):
 
 
 class MaintThread(threading.Thread):
-    """separate thread for the maintanance functions"""
+    """Separate thread for the Maintanance functions"""
 
     def __init__(self, threadid, name):
         threading.Thread.__init__(self)
@@ -203,16 +203,15 @@ class QuoteBank:
     def get_quote(self, quotes, topicname):
         topicname = self.remove_punctuation(topicname.lower())
         for quote in quotes:
-            q = self.remove_punctuation(quote.lower())
-            match = self.lcs(topicname, q)
+            match = self.lcs(topicname, self.remove_punctuation(quote.lower()))
+            # TODO: look for more than one match per quote
 
             if match:
-                match = [x for x in match.split() if len(x) > 2]  # list of words of the match that are > 2 characters
-                if match and len(max(match, key=len)) >= 6:  # if there is a word of at least 6 characters
-                    match = ' '.join(match)
+                if match and len(max([x for x in match.split()], key=len)) >= 6:  # if there is a word of at least 6 characters
+
                     for keyword in botconfig.redd_data['KEYWORDS']:
                         if self.lcs(keyword.lower(), match.lower()) in botconfig.redd_data['KEYWORDS']:
-                            self.quotes_matched[keyword + "-KEYWORD{:.>5}".format(quotes.index(quote))] = quote
+                            self.quotes_matched[match + "-KEYWORD{:.>5}".format(quotes.index(quote))] = quote
                             self.keyword_matched = True
                     if not self.keyword_matched:
                         self.quotes_matched[match + "{:.>5}".format(quotes.index(quote))] = quote
@@ -225,7 +224,7 @@ class QuoteBank:
                 log_this(keyword_matches_keys)
                 quote_to_return = self.quotes_matched[choice(keyword_matches_keys)]
             else:
-                longest_keys = [key for key in keys if len(key) >= len(max(keys, key=len)) - 1]  # all longest
+                longest_keys = [key for key in keys if len(key) >= len(max(keys, key=len)) - 2]  # all longest
                 log_this(longest_keys)
                 quote_to_return = self.quotes_matched[choice(longest_keys)]
 
