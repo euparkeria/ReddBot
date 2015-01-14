@@ -208,7 +208,8 @@ class QuoteBank:
             # TODO: look for more than one match per quote
 
             if match:
-                if match and len(max([x for x in match.split()], key=len)) >= 6:  # if there is a word of at least 6 characters
+                match_word_list = match.split()
+                if match_word_list and len(max(match_word_list, key=len)) >= 6:  # if there is a word of at least 6 characters
 
                     for keyword in botconfig.redd_data['KEYWORDS']:
                         if self.lcs(keyword.lower(), match.lower()) in botconfig.redd_data['KEYWORDS']:
