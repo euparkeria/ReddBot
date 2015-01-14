@@ -1,6 +1,7 @@
 import threading
 import time
 #from imgurpython.helpers.error import ImgurClientRateLimitError, ImgurClientError
+import math
 import praw
 import json
 import os
@@ -520,7 +521,7 @@ class WatchedTreads:
                                                                          subreddit=self.srs_subreddit,
                                                                          srs_karma=user_srs_karma_balance)
                     if invasion_number:
-                        srs_users[-1]['tag'] = int(round((invasion_number/7))) * '☠'
+                        srs_users[-1]['tag'] = int(round((math.log(invasion_number, 1.902) - 1.5))) * '☠'
 
                 self.already_processed_users.append(author)
         debug('Processed {0} new users for thread: {1} User LIST:'.format(new_user_counter, self.thread_url))
