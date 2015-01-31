@@ -444,7 +444,7 @@ class WatchedTreads:
     @staticmethod
     def update_user_database(username, subreddit, srs_karma):
         session = Session()
-        users_query = WatchedTreads.query_user_database(username, subreddit)
+        users_query = WatchedTreads.query_user_database(username, subreddit, session=session)
         invasion_number = 0
 
         if users_query:
@@ -470,11 +470,15 @@ class WatchedTreads:
         return invasion_number
 
     @staticmethod
-    def query_user_database(username, subreddit):
-        """Will return False if user doesnt exist"""
-        session = Session()
+    def query_user_database(username, subreddit, session=None):
+        """Will return False if user doesnt exist, if no session is give as argument will open and close it's own"""
+        no_session_argument = False
+        if not session:
+            session = Session()
+            no_session_argument = True
         users_query = session.query(SrsUser).filter_by(username=username, subreddit=subreddit).first()
-        Session.remove()
+        if no_session_argument:
+            Session.remove()
         if users_query:
             return users_query
         else:
@@ -557,7 +561,7 @@ class WatchedTreads:
                                    + user['username']
                                    + '](http://np.reddit.com/u/'
                                    + user['username']
-                                   + ')'
+                                   + ') '
                                    + user['tag']
                                    + '\n\n' for user in srs_users])
         return splitted_comment[0] + srs_users_lines + split_mark + splitted_comment[1]
