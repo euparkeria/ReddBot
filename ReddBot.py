@@ -23,8 +23,8 @@ from sqlalchemy.orm import sessionmaker, scoped_session
 watched_subreddit = "+".join(['all'])
 results_limit = 2000
 results_limit_comm = 900
-bot_agent_name = 'Mozilla/5.0 (X11; U; Linux i686; en-US) AppleWebKit/534.7 (KHTML, like Gecko)' \
-                 ' Chrome/7.0.517.41 Safari/534.7'
+bot_agent_name = 'Mozilla/9.0 (X11; U; Linux i686; en-US) AppleWebKit/834.7 (KHTML, like Gecko)' \
+                 ' Chromeo/33.0.517.41 Safari/546.7'
 loop_timer = 60
 secondary_timer = loop_timer * 5
 DEBUG_LEVEL = 1
