@@ -9,7 +9,7 @@ import pickle
 import re
 #from pandas import DataFrame
 from random import choice
-from praw.errors import APIException, ClientException
+from praw.errors import APIException, ClientException, InvalidCaptcha
 from requests import exceptions
 from twython import Twython
 from twython import TwythonError
@@ -289,6 +289,26 @@ class RedditOperations:
             return post_object
         elif len(result_url) == 8:
             return post_object.comments[0]
+
+    def register_new_username(self, username, password, captcha=None):
+        retry_attempts = 3
+        captcha_id = ''
+        failed_captcha = False
+        if failed_captcha and captcha_id:
+            captcha = {'iden': captcha_id, 'captcha': 'FYEMHB'}
+
+        for retry in range(retry_attempts):
+            try:
+                self.socmedia.reddit_session.create_redditor(user_name=username,
+                                                             password=password,
+                                                             captcha=captcha,
+                                                             raise_captcha_exception=True)
+                return True
+
+            except InvalidCaptcha as e:
+                captcha_id = e.response['captcha']
+                failed_captcha = True
+        return False
 
     def get_user_karma_balance(self, author, in_subreddit, user_comments_limit=500):
         user_srs_karma_balance = 0
