@@ -15,7 +15,7 @@ from twython import Twython
 from twython import TwythonError
 from sqlalchemy import create_engine
 from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy import Column, Integer, String
+from sqlalchemy import Column, Integer, String, Boolean
 from sqlalchemy.orm import sessionmaker, scoped_session
 #from imgurpython import ImgurClient
 
@@ -23,8 +23,8 @@ from sqlalchemy.orm import sessionmaker, scoped_session
 watched_subreddit = "+".join(['all'])
 results_limit = 2000
 results_limit_comm = 900
-bot_agent_name = 'Mozilla/9.0 (X11; U; Linux i686; en-US) AppleWebKit/834.7 (KHTML, like Gecko)' \
-                 ' Chromeo/33.0.517.41 Safari/546.7'
+bot_agent_name = 'Mozilla/5.0 (Windows NT 6.3; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko)' \
+                 ' Chrome/42.0.2311.39 Safari/537.36'
 loop_timer = 60
 secondary_timer = loop_timer * 5
 DEBUG_LEVEL = 1
@@ -78,6 +78,18 @@ class SrsUser(Base):
     last_check_date = Column(String)
     SRS_karma_balance = Column(Integer)
     invasion_number = Column(Integer)
+
+
+class BotAccounts(Base):
+    __tablename__ = 'BotAccounts'
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    username = Column(String, unique=True)
+    reddit_id = Column(String, unique=True)
+    password = Column(String)
+    last_check_date = Column(String)
+    ShadowBanned = Column(Boolean)
+
+#Base.metadata.create_all(engine)
 
 
 class MaintThread(threading.Thread):
@@ -308,6 +320,13 @@ class RedditOperations:
             except InvalidCaptcha as e:
                 captcha_id = e.response['captcha']
                 failed_captcha = True
+                debug("Failed: CAPTCHA CHALLENGE:{}".format(captcha_id))
+
+            except (APIException,
+                    ClientException,
+                    praw.requests.exceptions.HTTPError,
+                    praw.requests.exceptions.ConnectionError):
+                debug("Error: couldnt register new username")
         return False
 
     def get_user_karma_balance(self, author, in_subreddit, user_comments_limit=500):
@@ -403,6 +422,21 @@ class RedditOperations:
     @staticmethod
     def make_np(link):
         return link.replace('http://www.reddit.com', 'http://np.reddit.com')
+
+    def check_if_user_exists(self, username):
+        """check if user exists or shadowbanned"""
+        try:
+            user = self.socmedia.reddit_session.get_redditor(username)
+        except praw.requests.exceptions.HTTPError as e:
+            if e.response.status_code == 404:
+                return False
+        except (APIException,
+                praw.requests.exceptions.HTTPError,
+                praw.requests.exceptions.ConnectionError):
+            log_this('Error checking if user exists')
+        if user:
+            return True
+        return False
 
     def tweet_this(self, msg):
         if len(msg) > 140:
