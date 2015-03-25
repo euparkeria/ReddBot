@@ -1,13 +1,13 @@
 import threading
 import time
-#from imgurpython.helpers.error import ImgurClientRateLimitError, ImgurClientError
+from imgurpython.helpers.error import ImgurClientRateLimitError, ImgurClientError
 import math
 import praw
 import json
 import os
 import pickle
 import re
-#from pandas import DataFrame
+from pandas import DataFrame
 from random import choice
 from praw.errors import APIException, ClientException, InvalidCaptcha
 from requests import exceptions
@@ -17,14 +17,13 @@ from sqlalchemy import create_engine
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy import Column, Integer, String, Boolean
 from sqlalchemy.orm import sessionmaker, scoped_session
-#from imgurpython import ImgurClient
+from imgurpython import ImgurClient
 
 
 watched_subreddit = "+".join(['all'])
 results_limit = 2000
 results_limit_comm = 900
-bot_agent_name = 'Mozilla/5.0 (Windows NT 6.3; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko)' \
-                 ' Chrome/42.0.2311.39 Safari/537.36'
+bot_agent_name = 'Mozilla/5.0'
 loop_timer = 60
 secondary_timer = loop_timer * 5
 DEBUG_LEVEL = 1
@@ -44,7 +43,6 @@ class UsernameBank:
         self.username_count = len(botconfig.bot_auth_info['REDDIT_BOT_USERNAME'])
         self.already_tried = []
         self.defaut_username = botconfig.bot_auth_info['REDDIT_BOT_USERNAME'][0]  # first username is default
-        self.prev_username = ''  # previous used username
 
     def get_username(self, exclude=''):
         if not exclude:
@@ -62,11 +60,6 @@ class UsernameBank:
 
     def purge_tried_list(self):
         self.already_tried = []
-
-    def prev_username_login(self):
-        if self.reddit_username != self.prev_username:
-            reddit_operations.login(username_bank.prev_username)
-            self.prev_username = ''
 
 
 class SrsUser(Base):
@@ -178,7 +171,7 @@ class ConfigFiles:
                 redd_data = json.load(f)
                 redd_data['KEYWORDS'] = sorted(redd_data['KEYWORDS'], key=len, reverse=True)
                 redd_data['SRSs'] = [x.lower() for x in redd_data['SRSs']]
-                #redd_data['quotes'] = [''.join(('^', x.replace(" ", " ^"))) for x in redd_data['quotes']]
+                # redd_data['quotes'] = [''.join(('^', x.replace(" ", " ^"))) for x in redd_data['quotes']]
         except IOError:
             log_this("Error reading data file")
         return redd_data
@@ -211,7 +204,7 @@ class QuoteBank:
         for letter in quote:
             if letter not in punctuation:
                 punct_clear += letter
-        #return punct_clear.split()
+        # return punct_clear.split()
         return punct_clear
 
     def get_quote(self, quotes, topicname):
@@ -255,7 +248,6 @@ class RedditOperations:
         """class SocialMedia should only be needed within this class so init here"""
         self.socmedia = SocialMedia()
 
-    '''
     def upload_image(self, image_path):
         try:
             image_object = self.socmedia.imgur_client.upload_from_path(path=image_path)
@@ -263,7 +255,7 @@ class RedditOperations:
             debug('ERROR: Imgur Rate Limit Exceeded')
             return False
         return image_object
-    '''
+
     def login(self, username=''):
         try:
             if not username:
@@ -360,14 +352,13 @@ class RedditOperations:
         return authors_list
 
     def edit_comment(self, comment_id, comment_body, poster_username):
-        username_bank.prev_username = username_bank.reddit_username
         if username_bank.reddit_username != poster_username:
-            self.login(poster_username)
+            self.login(username=poster_username)
         try:
             comment = self.socmedia.reddit_session.get_info(thing_id=comment_id)
             comment.edit(comment_body)
             debug('Comment : {} edited.'.format(comment_id))
-            username_bank.prev_username_login()
+            self.login(username_bank.defaut_username)
         except (APIException,
                 praw.requests.exceptions.HTTPError,
                 praw.requests.exceptions.ConnectionError):
@@ -386,7 +377,6 @@ class RedditOperations:
         post_object = reddit_operations.get_post_object(result_url)
         return_obj = None
         retry_attemts = username_bank.username_count
-        username_bank.prev_username = username_bank.reddit_username
 
         for retry in range(retry_attemts):
             try:
@@ -406,7 +396,7 @@ class RedditOperations:
                                                                         username_bank.reddit_username))
                 self.login()
 
-        username_bank.prev_username_login()
+        self.login(username_bank.defaut_username)
         username_bank.purge_tried_list()
         return return_obj
 
