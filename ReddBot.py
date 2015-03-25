@@ -358,7 +358,8 @@ class RedditOperations:
             comment = self.socmedia.reddit_session.get_info(thing_id=comment_id)
             comment.edit(comment_body)
             debug('Comment : {} edited.'.format(comment_id))
-            self.login(username_bank.defaut_username)
+            if username_bank.reddit_username != username_bank.defaut_username:
+                self.login(username_bank.defaut_username)
         except (APIException,
                 praw.requests.exceptions.HTTPError,
                 praw.requests.exceptions.ConnectionError):
@@ -395,8 +396,8 @@ class RedditOperations:
                 log_this('{1} is BANNED in:{0}, trying to relog'.format(post_object.subreddit,
                                                                         username_bank.reddit_username))
                 self.login()
-
-        self.login(username_bank.defaut_username)
+        if username_bank.reddit_username != username_bank.defaut_username:
+            self.login(username_bank.defaut_username)
         username_bank.purge_tried_list()
         return return_obj
 
