@@ -107,7 +107,7 @@ class SocialMedia:
     def __init__(self):
         self.reddit_session = self.connect_to_reddit()
         self.twitter_session = self.connect_to_twitter()
-        #self.imgur_client = self.connect_to_imgur()
+        self.imgur_client = self.connect_to_imgur()
 
     @staticmethod
     def connect_to_reddit():
@@ -124,13 +124,12 @@ class SocialMedia:
         except TwythonError:
             log_this('ERROR: Cant authenticate into twitter')
         return t
-    '''
+
     @staticmethod
     def connect_to_imgur():
         imgur_client = ImgurClient(botconfig.bot_auth_info['IMGUR_CLIENT_ID'],
                                    botconfig.bot_auth_info['IMGUR_CLIENT_SECRET'])
         return imgur_client
-    '''
 
 
 class ConfigFiles:
