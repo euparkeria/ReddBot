@@ -1,5 +1,7 @@
 import threading
 import time
+from ggplot import ggplot, aes, geom_point, geom_line, theme_seaborn, stat_smooth, scale_y_continuous, \
+    scale_x_continuous, labs, xlim, ggsave
 from imgurpython.helpers.error import ImgurClientRateLimitError, ImgurClientError
 import math
 import praw
@@ -456,13 +458,13 @@ class WatchedTreads:
         self.graph_image_link = ''
         self.last_parent_post_score = reddit_operations.get_post_attribute(url=self.thread_url, attribute='score')
         self.parent_post_author = reddit_operations.get_post_attribute(url=self.thread_url, attribute='author')
-        #self.GraphData = DataFrame(data=[(0, self.last_parent_post_score)], columns=['Min', 'Score'])
+        self.GraphData = DataFrame(data=[(0, self.last_parent_post_score)], columns=['Min', 'Score'])
 
         WatchedTreads.watched_threads_list.append(self)
 
-        #self.draw_graph()
+        self.draw_graph()
         self.savecache()
-    """
+
     def draw_graph(self):
         filename = '{}.png'.format(self.bot_reply_object_id)
 
@@ -478,7 +480,7 @@ class WatchedTreads:
 
         ggsave(p, filename, width=8, height=5, dpi=100, scale=1)
         return filename
-        """
+
     @staticmethod
     def savecache():
         try:
@@ -540,12 +542,11 @@ class WatchedTreads:
             bot_comment_changed = True
 
         current_parent_post_score = reddit_operations.get_post_attribute(url=self.thread_url, attribute='score')
-        '''
+
         if self.last_parent_post_score is not current_parent_post_score:
             self.last_parent_post_score = current_parent_post_score
             self.update_graph()
-            bot_comment_changed = True
-        '''
+            #bot_comment_changed = True
 
         if bot_comment_changed:
             reddit_operations.edit_comment(comment_id=self.bot_reply_object_id,
@@ -579,19 +580,16 @@ class WatchedTreads:
         print([user['username'] + ':' + str(user['karma']) for user in srs_users])
         return srs_users
 
-    '''
     def update_graph(self):
         self.GraphData.loc[len(self.GraphData)] = [(time.time() - self.start_watch_time)/60,
                                                    self.last_parent_post_score]
         graph_image_name = self.draw_graph()
 
-        imgurl_image = reddit_operations.upload_image(graph_image_name)
-        if imgurl_image:
-            self.graph_image_link = imgurl_image['link']
+        #imgurl_image = reddit_operations.upload_image(graph_image_name)
+        #if imgurl_image:
+         #   self.graph_image_link = imgurl_image['link']
 
-            self.bot_body = re.sub('-- \[(.*)] --', '-- [[Karma Graph]({})] --'
-                                   .format(self.graph_image_link), self.bot_body)
-    '''
+         #   self.bot_body = re.sub('-- \[(.*)] --', '-- [[Karma Graph]({})] --'.format(self.graph_image_link), self.bot_body)
 
     @staticmethod
     def update_all():
@@ -692,7 +690,7 @@ class MatchedSubmissions:
             submissionlink = reddit_operations.make_np(self.args['dsubmission'].permalink)
             brigade_subreddit_link = '*[/r/{0}]({1})*'.format(self.args['dsubmission'].subreddit, submissionlink)
 
-            members_active = ['Members of {0} active in this thread:'.format(brigade_subreddit_link)]
+            members_active = ['Members of {0} participating in this thread:'.format(brigade_subreddit_link)]
 
             stars = ['★']
 
