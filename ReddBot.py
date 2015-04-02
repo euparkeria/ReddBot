@@ -382,11 +382,11 @@ class RedditOperations:
 
         for retry in range(retry_attemts):
             try:
-                if hasattr(post_object, 'body'):
+                if isinstance(post_object, praw.objects.Comment):
                     return_obj = post_object.reply(msg)
                     debug('NOTICE REPLIED to ID:{0}'.format(post_object.id))
                     break
-                else:
+                elif isinstance(post_object, praw.objects.Submission):
                     return_obj = post_object.add_comment(msg)
                     debug('NOTICE ADDED to ID:{0}'.format(post_object.id))
 
