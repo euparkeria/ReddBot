@@ -289,11 +289,11 @@ class RedditOperations:
         """
         """"""
         post_object = self.get_submission_by_url(url=url)
-        result_url = [x for x in url.split('/') if len(x)]
-        if len(result_url) == 7:
-            return post_object
-        elif len(result_url) == 8:
+        comment_url = re.compile("http[s]?://[a-z]{0,3}\.?reddit\.com/r/.{1,20}/comments/.{6,8}/.*/.{6,8}")
+        if comment_url.match(url):
             return post_object.comments[0]
+        else:
+            return post_object
 
     def register_new_username(self, username, password, captcha=None):
         retry_attempts = 3
@@ -322,7 +322,7 @@ class RedditOperations:
                 debug("Error: couldnt register new username")
         return False
 
-    def get_user_karma_balance(self, author, in_subreddit, user_comments_limit=500):
+    def get_user_karma_balance(self, author, in_subreddit, user_comments_limit=350):
         user_srs_karma_balance = 0
 
         try:
@@ -461,7 +461,7 @@ class WatchedTreads:
 
         WatchedTreads.watched_threads_list.append(self)
 
-        self.draw_graph()
+        #self.draw_graph()
         self.savecache()
 
     def draw_graph(self):
@@ -582,7 +582,7 @@ class WatchedTreads:
     def update_graph(self):
         self.GraphData.loc[len(self.GraphData)] = [(time.time() - self.start_watch_time)/60,
                                                    self.last_parent_post_score]
-        graph_image_name = self.draw_graph()
+        #graph_image_name = self.draw_graph()
 
         #imgurl_image = reddit_operations.upload_image(graph_image_name)
         #if imgurl_image:
