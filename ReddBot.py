@@ -375,7 +375,8 @@ class RedditOperations:
             return self.socmedia.reddit_session.get_comments(subreddit, limit=limit)
 
     def reply_to_url(self, msg, result_url):
-        """only comment object have the 'body' attribute"""
+        """reply to comment or add a comment to submission"""
+        '''get correct object depending on url'''
         post_object = reddit_operations.get_post_object(result_url)
         return_obj = None
         retry_attemts = username_bank.username_count
@@ -671,7 +672,8 @@ class MatchedSubmissions:
 
     def _detect_brigade(self):
         subreddit = str(self.args['dsubmission'].subreddit)
-        if subreddit.lower() in self.args['keyword_lists']['SRSs'] and 'reddit.com' in self.url \
+        reddit_link = re.compile("http[s]?://[a-z]{0,3}\.?[a-z]{0,2}\.?reddit\.com/r/.{1,20}/comments/.*")
+        if subreddit.lower() in self.args['keyword_lists']['SRSs'] and reddit_link.match(self.url) \
                 and not self.args['dsubmission'].is_self:
             self.is_srs = True
             return True
