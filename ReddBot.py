@@ -135,9 +135,7 @@ class SocialMedia:
 class ConfigFiles:
     def __init__(self):
         self.data_modified_time = 0
-        cache = self.loadcache()
-        if cache:
-            WatchedTreads.watched_threads_list = cache
+        self.cache = self.loadcache()
 
         self.redd_data = None
         self.bot_auth_info = None
@@ -163,7 +161,7 @@ class ConfigFiles:
                 return pickle.load(f)
         except IOError:
             debug('Cache File not Pressent')
-            return False
+            return []
 
     def readdatafile(self):
         try:
@@ -488,8 +486,6 @@ class RedditOperations:
 
 class WatchedTreads:
 
-    watched_threads_list = []
-
     def __init__(self, thread_url, srs_subreddit, srs_author, bot_reply_object_id, bot_reply_body, poster_username):
         self.thread_url = thread_url
         self.srs_subreddit = srs_subreddit
@@ -505,8 +501,6 @@ class WatchedTreads:
         self.parent_post_author = reddit_operations.get_post_attribute(url=self.thread_url, attribute='author')
         self.GraphData = DataFrame(data=[(0, self.last_parent_post_score)], columns=['Min', 'Score'])
 
-        WatchedTreads.watched_threads_list.append(self)
-
         #self.draw_graph()
         self.savecache()
 
@@ -514,7 +508,7 @@ class WatchedTreads:
     def savecache():
         try:
             with open(CACHEFILE, 'wb') as fa:
-                pickle.dump(WatchedTreads.watched_threads_list, fa)
+                pickle.dump(bot1.Watched_Threads, fa)
         except IOError:
             log_this('ERROR: Cant write cache file')
 
@@ -615,8 +609,8 @@ class WatchedTreads:
 
     @staticmethod
     def update_all():
-        debug('Currently Watching {} threads.'.format(len(WatchedTreads.watched_threads_list)))
-        for thread in WatchedTreads.watched_threads_list:
+        debug('Currently Watching {} threads.'.format(len(bot1.Watched_Threads)))
+        for thread in bot1.Watched_Threads:
             thread.update()
         WatchedTreads.savecache()
 
@@ -636,7 +630,7 @@ class WatchedTreads:
             time_watched = time.time() - self.start_watch_time
             debug('{0} Watched for {1} hours'.format(self.thread_url, time_watched/60/60))
             if time_watched > self.keep_alive:  # if older than 8 hours
-                WatchedTreads.watched_threads_list.remove(self)
+                bot1.Watched_Threads.remove(self)
                 return True
 
 
@@ -764,7 +758,9 @@ class ReddBot:
         self.twitter = None
         self.placeholder_id = None  # this doesn't always work !? but it will lower the traffic to some extent
         self.mthread = None  # maintanence thead
+        self.Watched_Threads = botconfig.cache   # list of currently watched brigade threads
 
+    def start_bot(self):
         loop_counter = 0
         while True:
             loop_counter += 1
@@ -864,7 +860,7 @@ class ReddBot:
                 debug(result.url)
                 if targeted_submission:
                         already_watched = False
-                        for thread in WatchedTreads.watched_threads_list:
+                        for thread in self.Watched_Threads:
 
                             if thread.thread_url in result.url:
                                 already_watched = True
@@ -872,13 +868,14 @@ class ReddBot:
                             try:
                                 reply = reddit_operations.reply_to_url(msg=result.msg_for_reply,
                                                                        result_url=result.url)
-                                WatchedTreads(thread_url=result.url,
-                                              srs_subreddit=str(result.args['dsubmission'].subreddit),
-                                              srs_author=str(result.args['dsubmission'].author),
-                                              bot_reply_object_id=reply.name,
-                                              bot_reply_body=reply.body,
-                                              poster_username=str(reply.author)
-                                              )
+                                thread = WatchedTreads(thread_url=result.url,
+                                                       srs_subreddit=str(result.args['dsubmission'].subreddit),
+                                                       srs_author=str(result.args['dsubmission'].author),
+                                                       bot_reply_object_id=reply.name,
+                                                       bot_reply_body=reply.body,
+                                                       poster_username=str(reply.author)
+                                                       )
+                                self.Watched_Threads.append(thread)
                                 #send_pm_to_owner("New Watch thread added by: {0} in: {1}".format(str(reply.author), result.url))
                             except AttributeError:
                                 log_this("ERROR: ALL USERS BANNED IN: {}".format(targeted_submission.subreddit))
@@ -909,3 +906,4 @@ reddit_operations = RedditOperations()
 reddit_operations.login(username_bank.defaut_username)
 
 bot1 = ReddBot()
+bot1.start_bot()
