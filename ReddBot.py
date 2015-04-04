@@ -290,7 +290,8 @@ class RedditOperations:
         :param url:
         """
         post_object = self.get_submission_by_url(url=url)
-        comment_url_pattern = re.compile("http[s]?://[a-z]{0,3}\.?reddit\.com/r/.{1,20}/comments/.{6,8}/.*/.{6,8}")
+        comment_url_pattern = re.compile("http[s]?://[a-z]{0,3}\.?[a-z]{0,2}\.?reddit\.com/r/.{1,20}/comments/.{6,8}/.*/.{6,8}")
+
         if comment_url_pattern.match(url):
             return post_object.comments[0]
         else:
