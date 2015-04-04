@@ -907,5 +907,3 @@ username_bank = UsernameBank()
 reddit_operations = RedditOperations()
 reddit_operations.login(username_bank.defaut_username)
 bot1 = ReddBot()
-
-
