@@ -763,7 +763,7 @@ class ReddBot:
         self.permcounters = {'comments': 0, 'submissions': 0}
         self.twitter = None
         self.placeholder_id = None  # this doesn't always work !? but it will lower the traffic to some extent
-        self.mthread = None
+        self.mthread = None  # maintanence thead
 
         loop_counter = 0
         while True:
