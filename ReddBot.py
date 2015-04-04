@@ -1,7 +1,5 @@
 import threading
 import time
-from ggplot import ggplot, aes, geom_point, geom_line, theme_seaborn, stat_smooth, scale_y_continuous, \
-    scale_x_continuous, labs, xlim, ggsave
 from imgurpython.helpers.error import ImgurClientRateLimitError, ImgurClientError
 import math
 import praw
@@ -25,7 +23,8 @@ from imgurpython import ImgurClient
 watched_subreddit = "+".join(['all'])
 results_limit = 2000
 results_limit_comm = 900
-bot_agent_name = 'Mozilla/5.0'
+karma_balance_post_limit = 350
+bot_agent_name = 'Mozilla/5.0 Allahu Akbar Browser v70'
 loop_timer = 60
 secondary_timer = loop_timer * 5
 DEBUG_LEVEL = 1
@@ -41,18 +40,19 @@ Session = scoped_session(session_factory)
 
 class UsernameBank:
     def __init__(self):
-        self.reddit_username = ""  # currently logged on with username
+        self.current_username = ""  # currently logged on with username
         self.username_count = len(botconfig.bot_auth_info['REDDIT_BOT_USERNAME'])
         self.already_tried = []
         self.defaut_username = botconfig.bot_auth_info['REDDIT_BOT_USERNAME'][0]  # first username is default
 
     def get_username(self, exclude=''):
+        """without arguments it will exclude the current username and login with random one"""
         if not exclude:
-            exclude = self.reddit_username
+            exclude = self.current_username
         self.already_tried.append(exclude)
 
         new_random_username = [x for x in botconfig.bot_auth_info['REDDIT_BOT_USERNAME']
-                               if x is not exclude and x not in self.already_tried]
+                               if x not in self.already_tried]
         if new_random_username:
             new_name = choice(new_random_username)
             self.already_tried.append(new_name)
@@ -262,14 +262,17 @@ class RedditOperations:
             if not username:
                 username = username_bank.get_username()
             self.socmedia.reddit_session.login(username, botconfig.bot_auth_info['REDDIT_BOT_PASSWORD'])
-            username_bank.reddit_username = username
-            debug('Sucessfully logged in as {0}'.format(username_bank.reddit_username))
+            username_bank.current_username = username
+            debug('Sucessfully logged in as {0}'.format(username_bank.current_username))
             time.sleep(3)
         except praw.errors.APIException:
             log_this('ERROR: Cant login to Reddit.com')
 
     def get_post_attribute(self, url, attribute):
-        """returns a post attribute as a string"""
+        """returns a post attribute as a string
+        :param url: url of the post
+        :param attribute: attribute to get
+        """
         value = None
         try:
             post_object = self.get_post_object(url)
@@ -286,21 +289,27 @@ class RedditOperations:
     def get_post_object(self, url):
         """
         returns correct object type for reply depending on url, comment or submission
+        :param url:
         """
-        """"""
         post_object = self.get_submission_by_url(url=url)
-        comment_url = re.compile("http[s]?://[a-z]{0,3}\.?reddit\.com/r/.{1,20}/comments/.{6,8}/.*/.{6,8}")
-        if comment_url.match(url):
+        comment_url_pattern = re.compile("http[s]?://[a-z]{0,3}\.?reddit\.com/r/.{1,20}/comments/.{6,8}/.*/.{6,8}")
+        if comment_url_pattern.match(url):
             return post_object.comments[0]
         else:
             return post_object
 
     def register_new_username(self, username, password, captcha=None):
+        """
+        :param username:
+        :param password:
+        :param captcha:
+        :return:
+        """
         retry_attempts = 3
         captcha_id = ''
         failed_captcha = False
         if failed_captcha and captcha_id:
-            captcha = {'iden': captcha_id, 'captcha': 'FYEMHB'}
+            captcha = {'iden': captcha_id, 'captcha': ''}
 
         for retry in range(retry_attempts):
             try:
@@ -322,7 +331,13 @@ class RedditOperations:
                 debug("Error: couldnt register new username")
         return False
 
-    def get_user_karma_balance(self, author, in_subreddit, user_comments_limit=350):
+    def get_user_karma_balance(self, author, in_subreddit, user_comments_limit=karma_balance_post_limit):
+        """
+        :param author:
+        :param in_subreddit:
+        :param user_comments_limit:
+        :return:
+        """
         user_srs_karma_balance = 0
 
         try:
@@ -338,6 +353,11 @@ class RedditOperations:
         return user_srs_karma_balance
 
     def get_authors_in_thread(self, url):
+        """
+        returns list of usernames writting in a thread by url
+        :param url:
+        :return:
+        """
         authors_list = []
         try:
             submission = self.get_submission_by_url(url)
@@ -353,13 +373,19 @@ class RedditOperations:
         return authors_list
 
     def edit_comment(self, comment_id, comment_body, poster_username):
-        if username_bank.reddit_username != poster_username:
+        """
+        :param comment_id:
+        :param comment_body:
+        :param poster_username:
+        :return:
+        """
+        if username_bank.current_username != poster_username:
             self.login(username=poster_username)
         try:
             comment = self.socmedia.reddit_session.get_info(thing_id=comment_id)
             comment.edit(comment_body)
             debug('Comment : {} edited.'.format(comment_id))
-            if username_bank.reddit_username != username_bank.defaut_username:
+            if username_bank.current_username != username_bank.defaut_username:
                 self.login(username_bank.defaut_username)
         except (APIException,
                 praw.requests.exceptions.HTTPError,
@@ -375,10 +401,16 @@ class RedditOperations:
             return self.socmedia.reddit_session.get_comments(subreddit, limit=limit)
 
     def reply_to_url(self, msg, result_url):
-        """reply to comment or add a comment to submission"""
+        """
+        reply to comment or add a comment to submission
+        :param msg:
+        :param result_url:
+        :return:
+        """
+
         '''get correct object depending on url'''
-        post_object = reddit_operations.get_post_object(result_url)
         return_obj = None
+        post_object = reddit_operations.get_post_object(result_url)
         retry_attemts = username_bank.username_count
 
         for retry in range(retry_attemts):
@@ -390,23 +422,30 @@ class RedditOperations:
                 elif isinstance(post_object, praw.objects.Submission):
                     return_obj = post_object.add_comment(msg)
                     debug('NOTICE ADDED to ID:{0}'.format(post_object.id))
-
                     break
             except (APIException,
                     praw.requests.exceptions.HTTPError,
                     praw.requests.exceptions.ConnectionError):
-                log_this('{1} is BANNED in:{0}, trying to relog'.format(post_object.subreddit,
-                                                                        username_bank.reddit_username))
+                log_this('{1} is BANNED in:{0}, reloging'.format(post_object.subreddit, username_bank.current_username))
                 self.login()
-        if username_bank.reddit_username != username_bank.defaut_username:
+
+        if username_bank.current_username != username_bank.defaut_username:
             self.login(username_bank.defaut_username)
         username_bank.purge_tried_list()
         return return_obj
 
     def get_submission_by_url(self, url):
+        """
+        :param url:
+        :return:
+        """
         return self.socmedia.reddit_session.get_submission(url)
 
     def send_pm_to_owner(self, pm_text):
+        """
+        :param pm_text:
+        :return:
+        """
         try:
             self.socmedia.reddit_session.user.send_message(botconfig.bot_auth_info['REDDIT_PM_TO'], pm_text)
         except (APIException, praw.requests.exceptions.HTTPError, praw.requests.exceptions.ConnectionError):
@@ -417,7 +456,12 @@ class RedditOperations:
         return link.replace('http://www.reddit.com', 'http://np.reddit.com')
 
     def check_if_user_exists(self, username):
-        """check if user exists or shadowbanned"""
+        """
+        check if user exists or shadowbanned
+        :param username:
+        :return:
+        """
+        user = None
         try:
             user = self.socmedia.reddit_session.get_redditor(username)
         except praw.requests.exceptions.HTTPError as e:
@@ -443,6 +487,7 @@ class RedditOperations:
 
 
 class WatchedTreads:
+
     watched_threads_list = []
 
     def __init__(self, thread_url, srs_subreddit, srs_author, bot_reply_object_id, bot_reply_body, poster_username):
@@ -464,22 +509,6 @@ class WatchedTreads:
 
         #self.draw_graph()
         self.savecache()
-
-    def draw_graph(self):
-        filename = '{}.png'.format(self.bot_reply_object_id)
-
-        p = ggplot(aes(x='Min', y='Score'), data=self.GraphData, ) +\
-            geom_point(color='red', size=20) +\
-            geom_line(colour="pink") +\
-            theme_seaborn(context='paper') +\
-            stat_smooth(colour='magenta') +\
-            scale_y_continuous("{}'s post Karma".format(self.parent_post_author)) +\
-            scale_x_continuous("Minutes since the brigade began") +\
-            labs(title="Brigade Effect Graph") +\
-            xlim(0)
-
-        ggsave(p, filename, width=8, height=5, dpi=100, scale=1)
-        return filename
 
     @staticmethod
     def savecache():
@@ -583,13 +612,6 @@ class WatchedTreads:
     def update_graph(self):
         self.GraphData.loc[len(self.GraphData)] = [(time.time() - self.start_watch_time)/60,
                                                    self.last_parent_post_score]
-        #graph_image_name = self.draw_graph()
-
-        #imgurl_image = reddit_operations.upload_image(graph_image_name)
-        #if imgurl_image:
-         #   self.graph_image_link = imgurl_image['link']
-
-         #   self.bot_body = re.sub('-- \[(.*)] --', '-- [[Karma Graph]({})] --'.format(self.graph_image_link), self.bot_body)
 
     @staticmethod
     def update_all():
@@ -622,8 +644,8 @@ class MatchedSubmissions:
 
     matching_results = []
 
-    def __init__(self, dsubmission, target, keyword_lists):
-        self.args = {'dsubmission': dsubmission, 'target': target, 'keyword_lists': keyword_lists}
+    def __init__(self, dsubmission, target):
+        self.args = {'dsubmission': dsubmission, 'target': target}
         self.body_text = self._get_body_text()
         self.url = self._get_clean_url()
 
@@ -664,7 +686,7 @@ class MatchedSubmissions:
             return self.args['dsubmission'].body
 
     def _find_matching_keywords(self):
-        for keyword in self.args['keyword_lists']['KEYWORDS']:
+        for keyword in botconfig.redd_data['KEYWORDS']:
             if keyword.lower() in self.body_text.lower():
                 self.keyword_matched = keyword
                 return True
@@ -673,7 +695,7 @@ class MatchedSubmissions:
     def _detect_brigade(self):
         subreddit = str(self.args['dsubmission'].subreddit)
         reddit_link = re.compile("http[s]?://[a-z]{0,3}\.?[a-z]{0,2}\.?reddit\.com/r/.{1,20}/comments/.*")
-        if subreddit.lower() in self.args['keyword_lists']['SRSs'] and reddit_link.match(self.url) \
+        if subreddit.lower() in botconfig.redd_data['SRSs'] and reddit_link.match(self.url) \
                 and not self.args['dsubmission'].is_self:
             self.is_srs = True
             return True
@@ -687,7 +709,7 @@ class MatchedSubmissions:
         """needs to be redone completely"""
         if self.is_srs:
             quote = QuoteBank()
-            quote = quote.get_quote(self.args['keyword_lists']['quotes'], self.args['dsubmission'].title)
+            quote = quote.get_quote(botconfig.redd_data['quotes'], self.args['dsubmission'].title)
             submissionlink = reddit_operations.make_np(self.args['dsubmission'].permalink)
             brigade_subreddit_link = '*[/r/{0}]({1})*'.format(self.args['dsubmission'].subreddit, submissionlink)
 
@@ -751,6 +773,7 @@ class ReddBot:
                 loop_counter = 0
 
             self._mainlooper()
+            time.sleep(loop_timer)
 
     def _maintenance_loop(self):
         maint_thread_name = "Maintenance Thread"
@@ -785,8 +808,6 @@ class ReddBot:
 
         debug(self.pulllimit['submissions'])
         debug(self.pulllimit['comments'])
-
-        time.sleep(loop_timer)
 
     def _calculate_pull_limit(self, lastpullnum, target):
         """this needs to be done better"""
@@ -826,7 +847,7 @@ class ReddBot:
         if new_submissions:
 
             for new_submission in new_submissions:
-                MatchedSubmissions(target=target, dsubmission=new_submission, keyword_lists=botconfig.redd_data)
+                MatchedSubmissions(target=target, dsubmission=new_submission)
 
             if MatchedSubmissions.matching_results:
                 self.dispatch_nitifications(results_list=MatchedSubmissions.matching_results)
