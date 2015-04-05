@@ -170,6 +170,7 @@ class ConfigFiles:
                 redd_data = json.load(f)
                 redd_data['KEYWORDS'] = sorted(redd_data['KEYWORDS'], key=len, reverse=True)
                 redd_data['SRSs'] = [x.lower() for x in redd_data['SRSs']]
+                redd_data['Ignored_Subreddits'] = [x.lower for x in redd_data['Ignored_Subreddits']]
                 # redd_data['quotes'] = [''.join(('^', x.replace(" ", " ^"))) for x in redd_data['quotes']]
         except IOError:
             log_this("Error reading data file")
@@ -689,6 +690,8 @@ class MatchedSubmissions:
 
     def _detect_brigade(self):
         subreddit = str(self.args['dsubmission'].subreddit)
+        if subreddit.lower() in botconfig.redd_data['Ignored_Subreddits']:
+            return False
         reddit_link = re.compile("http[s]?://[a-z]{0,3}\.?[a-z]{0,2}\.?reddit\.com/r/.{1,20}/comments/.*")
         if subreddit.lower() in botconfig.redd_data['SRSs'] and reddit_link.match(self.url) \
                 and not self.args['dsubmission'].is_self:
