@@ -643,6 +643,7 @@ class MatchedSubmissions:
         self.args = {'dsubmission': dsubmission, 'target': target}
         self.body_text = self._get_body_text()
         self.url = self._get_clean_url()
+        self.subreddit = str(self.args['dsubmission'].subreddit).lower()
 
         self.is_srs = False
         self.keyword_matched = ''
@@ -688,10 +689,10 @@ class MatchedSubmissions:
         return False
 
     def _detect_brigade(self):
-        subreddit = str(self.args['dsubmission'].subreddit).lower()
+
         reddit_link_pattern = re.compile("http[s]?://[a-z]{0,3}\.?[a-z]{0,2}\.?reddit\.com/r/.{1,20}/comments/.*")
 
-        if subreddit in botconfig.redd_data['SRSs']:
+        if self.subreddit in botconfig.redd_data['SRSs']:
             if reddit_link_pattern.match(self.url) and not self.args['dsubmission'].is_self:
                 self.is_srs = True
                 return True
@@ -866,12 +867,12 @@ class ReddBot:
 
                             if thread.thread_url in result.url:
                                 already_watched = True
-                        if not already_watched:
+                        if not already_watched and result.subreddit not in botconfig.redd_data['Ignored_Subreddits']:
                             try:
                                 reply = reddit_operations.reply_to_url(msg=result.msg_for_reply,
                                                                        result_url=result.url)
                                 thread = WatchedTreads(thread_url=result.url,
-                                                       srs_subreddit=str(result.args['dsubmission'].subreddit),
+                                                       srs_subreddit=result.subreddit,
                                                        srs_author=str(result.args['dsubmission'].author),
                                                        bot_reply_object_id=reply.name,
                                                        bot_reply_body=reply.body,
