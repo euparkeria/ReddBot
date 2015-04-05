@@ -34,7 +34,7 @@ AUTHFILE = 'ReddAUTH.json'
 DATAFILE = 'ReddDATA.json'
 
 '''
-Database config
+Database configuration
 '''
 engine = create_engine('sqlite:///ReddDatabase.db')
 Base = declarative_base()
@@ -43,13 +43,13 @@ Session = scoped_session(session_factory)
 
 
 '''
-logging config
+logging configguration
 '''
-BotLogger = logging.getLogger('--ReddBot--')
+BotLogger = logging.getLogger('ReddBot')
 BotLogger.setLevel(logging.DEBUG)
 
 nicelogformat = logging.Formatter(fmt='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-                                  datefmt='%m/%d/%Y %I:%M:%S %p')
+                                  datefmt='%m/%d %I:%M')
 
 ConsoleHandler = logging.StreamHandler()
 ConsoleHandler.setLevel(logging.INFO)
@@ -148,7 +148,7 @@ class SocialMedia:
                         botconfig.bot_auth_info['OAUTH_TOKEN'],
                         botconfig.bot_auth_info['OAUTH_TOKEN_SECRET'])
         except TwythonError:
-            BotLogger.error('ERROR: Cant authenticate into twitter')
+            BotLogger.error('Cant authenticate into twitter')
         return t
 
     @staticmethod
@@ -278,7 +278,7 @@ class RedditOperations:
         try:
             image_object = self.socmedia.imgur_client.upload_from_path(path=image_path)
         except (ImgurClientRateLimitError, ImgurClientError):
-            BotLogger.error('ERROR: Imgur Rate Limit Exceeded')
+            BotLogger.error('Imgur Rate Limit Exceeded')
             return False
         return image_object
 
@@ -291,7 +291,7 @@ class RedditOperations:
             BotLogger.info('Sucessfully logged in as {0}'.format(username_bank.current_username))
             time.sleep(3)
         except praw.errors.APIException:
-            BotLogger.error('ERROR: Cant login to Reddit.com')
+            BotLogger.error('Cant login to Reddit.com')
 
     def get_post_attribute(self, url, attribute):
         """returns a post attribute as a string
@@ -308,7 +308,7 @@ class RedditOperations:
                 ClientException,
                 praw.requests.exceptions.HTTPError,
                 praw.requests.exceptions.ConnectionError):
-            BotLogger.error("Error: Couldnt get post score")
+            BotLogger.error("Couldnt get post score")
         return str(value)
 
     def get_post_object(self, url):
@@ -354,7 +354,7 @@ class RedditOperations:
                     ClientException,
                     praw.requests.exceptions.HTTPError,
                     praw.requests.exceptions.ConnectionError):
-                BotLogger.error("Error: couldnt register new username")
+                BotLogger.error("couldnt register new username")
         return False
 
     def get_user_karma_balance(self, author, in_subreddit, user_comments_limit=karma_balance_post_limit):
@@ -375,7 +375,7 @@ class RedditOperations:
                 ClientException,
                 praw.requests.exceptions.HTTPError,
                 praw.requests.exceptions.ConnectionError):
-            BotLogger.error('ERROR: Cant get user SRS karma balance!!')
+            BotLogger.error('Cant get user SRS karma balance!!')
         return user_srs_karma_balance
 
     def get_authors_in_thread(self, url):
@@ -395,7 +395,7 @@ class RedditOperations:
         except (APIException,
                 praw.requests.exceptions.HTTPError,
                 praw.requests.exceptions.ConnectionError):
-            BotLogger.error('ERROR:couldnt get all authors from thread')
+            BotLogger.error('couldnt get all authors from thread')
         return authors_list
 
     def edit_comment(self, comment_id, comment_body, poster_username):
@@ -416,7 +416,7 @@ class RedditOperations:
         except (APIException,
                 praw.requests.exceptions.HTTPError,
                 praw.requests.exceptions.ConnectionError):
-            BotLogger.error('ERROR: Cant edit comment')
+            BotLogger.error('Cant edit comment')
 
     def get_comments_or_subs(self, placeholder_id='', subreddit=watched_subreddit,
                              limit=results_limit, target='submissions'):
@@ -475,7 +475,7 @@ class RedditOperations:
         try:
             self.socmedia.reddit_session.user.send_message(botconfig.bot_auth_info['REDDIT_PM_TO'], pm_text)
         except (APIException, praw.requests.exceptions.HTTPError, praw.requests.exceptions.ConnectionError):
-            BotLogger.error('ERROR:Cant send pm')
+            BotLogger.error('Cant send pm')
 
     @staticmethod
     def make_np(link):
@@ -509,7 +509,7 @@ class RedditOperations:
             self.socmedia.twitter_session.update_status(status=msg)
             BotLogger.info('TWEET SENT!!!')
         except TwythonError:
-            BotLogger.error('ERROR: couldnt update twitter status')
+            BotLogger.error('couldnt update twitter status')
 
 
 class WatchedTreads:
@@ -537,10 +537,16 @@ class WatchedTreads:
             with open(CACHEFILE, 'wb') as fa:
                 pickle.dump(bot1.Watched_Threads, fa)
         except IOError:
-            BotLogger.error('ERROR: Cant write cache file')
+            BotLogger.error('Cant write cache file')
 
     @staticmethod
     def update_user_database(username, subreddit, srs_karma):
+        """
+        :param username:
+        :param subreddit:
+        :param srs_karma:
+        :return:
+        """
         session = Session()
         users_query = WatchedTreads.query_user_database(username, subreddit, session=session)
         invasion_number = 0
@@ -863,7 +869,7 @@ class ReddBot:
             if new_submissions_list:
                 self.placeholder_id = new_submissions_list[0].id
         except (praw.errors.APIException, exceptions.HTTPError, exceptions.ConnectionError):
-            BotLogger.error('ERROR:Cannot connect to reddit!!!')
+            BotLogger.error('Cannot connect to reddit!!!')
         return new_submissions_list
 
     def _contentloop(self, target):
@@ -884,7 +890,7 @@ class ReddBot:
                 try:
                     targeted_submission = reddit_operations.get_submission_by_url(result.url)
                 except (APIException, praw.requests.exceptions.HTTPError, praw.requests.exceptions.ConnectionError):
-                    BotLogger.error('ERROR: cant get submission by url, Invalid submission url!?')
+                    BotLogger.error('cant get submission by url, Invalid submission url!?')
                     targeted_submission = None
                 BotLogger.debug(result.url)
                 if targeted_submission:
@@ -908,7 +914,7 @@ class ReddBot:
                                 WatchedTreads.savecache()
                                 #send_pm_to_owner("New Watch thread added by: {0} in: {1}".format(str(reply.author), result.url))
                             except AttributeError:
-                                BotLogger.error("ERROR: ALL USERS BANNED IN: {}".format(targeted_submission.subreddit))
+                                BotLogger.error("ALL USERS BANNED IN: {}".format(targeted_submission.subreddit))
                         else:
                             BotLogger.info("THREAD ALREADY WATCHED!")
 
