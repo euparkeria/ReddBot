@@ -689,14 +689,13 @@ class MatchedSubmissions:
         return False
 
     def _detect_brigade(self):
-        subreddit = str(self.args['dsubmission'].subreddit)
-        if subreddit.lower() in botconfig.redd_data['Ignored_Subreddits']:
-            return False
-        reddit_link = re.compile("http[s]?://[a-z]{0,3}\.?[a-z]{0,2}\.?reddit\.com/r/.{1,20}/comments/.*")
-        if subreddit.lower() in botconfig.redd_data['SRSs'] and reddit_link.match(self.url) \
-                and not self.args['dsubmission'].is_self:
-            self.is_srs = True
-            return True
+        subreddit = str(self.args['dsubmission'].subreddit).lower()
+        reddit_link_pattern = re.compile("http[s]?://[a-z]{0,3}\.?[a-z]{0,2}\.?reddit\.com/r/.{1,20}/comments/.*")
+
+        if subreddit in botconfig.redd_data['SRSs']:
+            if reddit_link_pattern.match(self.url) and not self.args['dsubmission'].is_self:
+                self.is_srs = True
+                return True
         return False
 
     @staticmethod
