@@ -504,7 +504,6 @@ class WatchedTreads:
         self.GraphData = DataFrame(data=[(0, self.last_parent_post_score)], columns=['Min', 'Score'])
 
         #self.draw_graph()
-        self.savecache()
 
     @staticmethod
     def savecache():
@@ -879,6 +878,7 @@ class ReddBot:
                                                        poster_username=str(reply.author)
                                                        )
                                 self.Watched_Threads.append(thread)
+                                WatchedTreads.savecache()
                                 #send_pm_to_owner("New Watch thread added by: {0} in: {1}".format(str(reply.author), result.url))
                             except AttributeError:
                                 log_this("ERROR: ALL USERS BANNED IN: {}".format(targeted_submission.subreddit))
