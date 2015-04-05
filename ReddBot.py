@@ -7,6 +7,7 @@ import json
 import os
 import pickle
 import re
+import logging
 from pandas import DataFrame
 from random import choice
 from praw.errors import APIException, ClientException, InvalidCaptcha
@@ -24,18 +25,43 @@ watched_subreddit = "+".join(['all'])
 results_limit = 2000
 results_limit_comm = 900
 karma_balance_post_limit = 350
-bot_agent_name = 'Mozilla/5.0 Allahu Akbar Browser v70'
+bot_agent_name = 'Mozilla/5.0 Allahu Akbar Browser v72virgins'
 loop_timer = 60
 secondary_timer = loop_timer * 5
-DEBUG_LEVEL = 1
+
 CACHEFILE = 'reddbot.cache'
 AUTHFILE = 'ReddAUTH.json'
 DATAFILE = 'ReddDATA.json'
 
+'''
+Database config
+'''
 engine = create_engine('sqlite:///ReddDatabase.db')
 Base = declarative_base()
 session_factory = sessionmaker(bind=engine)
 Session = scoped_session(session_factory)
+
+
+'''
+logging config
+'''
+BotLogger = logging.getLogger('--ReddBot--')
+BotLogger.setLevel(logging.DEBUG)
+
+nicelogformat = logging.Formatter(fmt='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+                                  datefmt='%m/%d/%Y %I:%M:%S %p')
+
+ConsoleHandler = logging.StreamHandler()
+ConsoleHandler.setLevel(logging.INFO)
+ConsoleHandler.setFormatter(nicelogformat)
+
+FileHandler = logging.FileHandler(filename='log.txt')
+FileHandler.setLevel(logging.WARNING)
+FileHandler.setFormatter(nicelogformat)
+
+
+BotLogger.addHandler(ConsoleHandler)
+BotLogger.addHandler(FileHandler)
 
 
 class UsernameBank:
@@ -122,7 +148,7 @@ class SocialMedia:
                         botconfig.bot_auth_info['OAUTH_TOKEN'],
                         botconfig.bot_auth_info['OAUTH_TOKEN_SECRET'])
         except TwythonError:
-            log_this('ERROR: Cant authenticate into twitter')
+            BotLogger.error('ERROR: Cant authenticate into twitter')
         return t
 
     @staticmethod
@@ -145,7 +171,7 @@ class ConfigFiles:
         if os.stat(DATAFILE).st_mtime > self.data_modified_time:
             self.redd_data = self.readdatafile()
             self.bot_auth_info = self.readauthfile()
-            debug('CONFIG FILES RELOADED!')
+            BotLogger.info('CONFIG FILES RELOADED!')
             return True
 
     @staticmethod
@@ -160,7 +186,7 @@ class ConfigFiles:
             with open(CACHEFILE, 'rb') as f:
                 return pickle.load(f)
         except IOError:
-            debug('Cache File not Pressent')
+            BotLogger.info('Cache File not Pressent')
             return []
 
     def readdatafile(self):
@@ -173,7 +199,7 @@ class ConfigFiles:
                 redd_data['Ignored_Subreddits'] = [x.lower for x in redd_data['Ignored_Subreddits']]
                 # redd_data['quotes'] = [''.join(('^', x.replace(" ", " ^"))) for x in redd_data['quotes']]
         except IOError:
-            log_this("Error reading data file")
+            BotLogger.error("Error reading data file")
         return redd_data
 
 
@@ -229,11 +255,11 @@ class QuoteBank:
 
             if self.keyword_matched:
                 keyword_matches_keys = [key for key in keys if '-KEYWORD' in key]
-                log_this(keyword_matches_keys)
+                BotLogger.error(keyword_matches_keys)
                 quote_to_return = self.quotes_matched[choice(keyword_matches_keys)]
             else:
                 longest_keys = [key for key in keys if len(key) >= len(max(keys, key=len)) - 2]  # all longest
-                log_this(longest_keys)
+                BotLogger.error(longest_keys)
                 quote_to_return = self.quotes_matched[choice(longest_keys)]
 
         else:
@@ -252,7 +278,7 @@ class RedditOperations:
         try:
             image_object = self.socmedia.imgur_client.upload_from_path(path=image_path)
         except (ImgurClientRateLimitError, ImgurClientError):
-            debug('ERROR: Imgur Rate Limit Exceeded')
+            BotLogger.error('ERROR: Imgur Rate Limit Exceeded')
             return False
         return image_object
 
@@ -262,10 +288,10 @@ class RedditOperations:
                 username = username_bank.get_username()
             self.socmedia.reddit_session.login(username, botconfig.bot_auth_info['REDDIT_BOT_PASSWORD'])
             username_bank.current_username = username
-            debug('Sucessfully logged in as {0}'.format(username_bank.current_username))
+            BotLogger.info('Sucessfully logged in as {0}'.format(username_bank.current_username))
             time.sleep(3)
         except praw.errors.APIException:
-            log_this('ERROR: Cant login to Reddit.com')
+            BotLogger.error('ERROR: Cant login to Reddit.com')
 
     def get_post_attribute(self, url, attribute):
         """returns a post attribute as a string
@@ -282,7 +308,7 @@ class RedditOperations:
                 ClientException,
                 praw.requests.exceptions.HTTPError,
                 praw.requests.exceptions.ConnectionError):
-            debug("Error: Couldnt get post score")
+            BotLogger.error("Error: Couldnt get post score")
         return str(value)
 
     def get_post_object(self, url):
@@ -322,13 +348,13 @@ class RedditOperations:
             except InvalidCaptcha as e:
                 captcha_id = e.response['captcha']
                 failed_captcha = True
-                debug("Failed: CAPTCHA CHALLENGE:{}".format(captcha_id))
+                BotLogger.error("Failed: CAPTCHA CHALLENGE:{}".format(captcha_id))
 
             except (APIException,
                     ClientException,
                     praw.requests.exceptions.HTTPError,
                     praw.requests.exceptions.ConnectionError):
-                debug("Error: couldnt register new username")
+                BotLogger.error("Error: couldnt register new username")
         return False
 
     def get_user_karma_balance(self, author, in_subreddit, user_comments_limit=karma_balance_post_limit):
@@ -349,7 +375,7 @@ class RedditOperations:
                 ClientException,
                 praw.requests.exceptions.HTTPError,
                 praw.requests.exceptions.ConnectionError):
-            log_this('ERROR: Cant get user SRS karma balance!!')
+            BotLogger.error('ERROR: Cant get user SRS karma balance!!')
         return user_srs_karma_balance
 
     def get_authors_in_thread(self, url):
@@ -369,7 +395,7 @@ class RedditOperations:
         except (APIException,
                 praw.requests.exceptions.HTTPError,
                 praw.requests.exceptions.ConnectionError):
-            log_this('ERROR:couldnt get all authors from thread')
+            BotLogger.error('ERROR:couldnt get all authors from thread')
         return authors_list
 
     def edit_comment(self, comment_id, comment_body, poster_username):
@@ -384,13 +410,13 @@ class RedditOperations:
         try:
             comment = self.socmedia.reddit_session.get_info(thing_id=comment_id)
             comment.edit(comment_body)
-            debug('Comment : {} edited.'.format(comment_id))
+            BotLogger.info('Comment : {} edited.'.format(comment_id))
             if username_bank.current_username != username_bank.defaut_username:
                 self.login(username_bank.defaut_username)
         except (APIException,
                 praw.requests.exceptions.HTTPError,
                 praw.requests.exceptions.ConnectionError):
-            log_this('ERROR: Cant edit comment')
+            BotLogger.error('ERROR: Cant edit comment')
 
     def get_comments_or_subs(self, placeholder_id='', subreddit=watched_subreddit,
                              limit=results_limit, target='submissions'):
@@ -417,16 +443,16 @@ class RedditOperations:
             try:
                 if isinstance(post_object, praw.objects.Comment):
                     return_obj = post_object.reply(msg)
-                    debug('NOTICE REPLIED to ID:{0}'.format(post_object.id))
+                    BotLogger.info('NOTICE REPLIED to ID:{0}'.format(post_object.id))
                     break
                 elif isinstance(post_object, praw.objects.Submission):
                     return_obj = post_object.add_comment(msg)
-                    debug('NOTICE ADDED to ID:{0}'.format(post_object.id))
+                    BotLogger.info('NOTICE ADDED to ID:{0}'.format(post_object.id))
                     break
             except (APIException,
                     praw.requests.exceptions.HTTPError,
                     praw.requests.exceptions.ConnectionError):
-                log_this('{1} is BANNED in:{0}, reloging'.format(post_object.subreddit, username_bank.current_username))
+                BotLogger.error('{1} is BANNED in:{0}, reloging'.format(post_object.subreddit, username_bank.current_username))
                 self.login()
 
         if username_bank.current_username != username_bank.defaut_username:
@@ -449,7 +475,7 @@ class RedditOperations:
         try:
             self.socmedia.reddit_session.user.send_message(botconfig.bot_auth_info['REDDIT_PM_TO'], pm_text)
         except (APIException, praw.requests.exceptions.HTTPError, praw.requests.exceptions.ConnectionError):
-            log_this('ERROR:Cant send pm')
+            BotLogger.error('ERROR:Cant send pm')
 
     @staticmethod
     def make_np(link):
@@ -470,7 +496,7 @@ class RedditOperations:
         except (APIException,
                 praw.requests.exceptions.HTTPError,
                 praw.requests.exceptions.ConnectionError):
-            log_this('Error checking if user exists')
+            BotLogger.error('Error checking if user exists')
         if user:
             return True
         return False
@@ -478,12 +504,12 @@ class RedditOperations:
     def tweet_this(self, msg):
         if len(msg) > 140:
             msg = msg[:139]
-            log_this('MSG exceeding 140 characters!!')
+            BotLogger.error('MSG exceeding 140 characters!!')
         try:
             self.socmedia.twitter_session.update_status(status=msg)
-            debug('TWEET SENT!!!')
+            BotLogger.info('TWEET SENT!!!')
         except TwythonError:
-            log_this('ERROR: couldnt update twitter status')
+            BotLogger.error('ERROR: couldnt update twitter status')
 
 
 class WatchedTreads:
@@ -511,7 +537,7 @@ class WatchedTreads:
             with open(CACHEFILE, 'wb') as fa:
                 pickle.dump(bot1.Watched_Threads, fa)
         except IOError:
-            log_this('ERROR: Cant write cache file')
+            BotLogger.error('ERROR: Cant write cache file')
 
     @staticmethod
     def update_user_database(username, subreddit, srs_karma):
@@ -527,9 +553,9 @@ class WatchedTreads:
                 users_query.invasion_number = 1
             users_query.last_check_date = time.time()
             users_query.SRS_karma_balance = srs_karma
-            debug("Updating database entry on: {1}@{0} !".format(subreddit, username))
+            BotLogger.info("Updating database entry on: {1}@{0} !".format(subreddit, username))
         else:
-            debug("{1}@{0} NOT IN database!".format(subreddit, username))
+            BotLogger.info("{1}@{0} NOT IN database!".format(subreddit, username))
             stupiduser = SrsUser(username=username,
                                  subreddit=subreddit,
                                  last_check_date=time.time(),
@@ -538,7 +564,7 @@ class WatchedTreads:
 
         session.commit()
         Session.remove()
-        debug('Database Updated')
+        BotLogger.info('Database Updated')
         return invasion_number
 
     @staticmethod
@@ -578,7 +604,7 @@ class WatchedTreads:
                                            poster_username=self.poster_username)
 
         if self.check_if_expired():
-            debug('This Thread has Expired and is Removed! {0} '.format(self.thread_url))
+            BotLogger.info('This Thread has Expired and is Removed! {0} '.format(self.thread_url))
 
     def check_for_new_invaders(self):
         karma_upper_limit = 5  # if poster has more than that amount of karma in the srs subreddit he is added
@@ -600,7 +626,7 @@ class WatchedTreads:
                         srs_users[-1]['tag'] = int(round((math.log(invasion_number, 1.902) - 1.5))) * '☠'
 
                 self.already_processed_users.append(author)
-        debug('Processed {0} new users for thread: {1} User LIST:'.format(new_user_counter, self.thread_url))
+        BotLogger.info('Processed {0} new users for thread: {1} User LIST:'.format(new_user_counter, self.thread_url))
         print([user['username'] + ':' + str(user['karma']) for user in srs_users])
         return srs_users
 
@@ -610,7 +636,7 @@ class WatchedTreads:
 
     @staticmethod
     def update_all():
-        debug('Currently Watching {} threads.'.format(len(bot1.Watched_Threads)))
+        BotLogger.info('Currently Watching {} threads.'.format(len(bot1.Watched_Threads)))
         for thread in bot1.Watched_Threads:
             thread.update()
         WatchedTreads.savecache()
@@ -629,7 +655,7 @@ class WatchedTreads:
 
     def check_if_expired(self):
             time_watched = time.time() - self.start_watch_time
-            debug('{0} Watched for {1} hours'.format(self.thread_url, time_watched/60/60))
+            BotLogger.info('{0} Watched for {1} hours'.format(self.thread_url, time_watched/60/60))
             if time_watched > self.keep_alive:  # if older than 8 hours
                 bot1.Watched_Threads.remove(self)
                 return True
@@ -792,12 +818,12 @@ class ReddBot:
             buffer_reset_lenght = self.pulllimit[loop] * 10
             if len(self.processed_objects[loop]) >= buffer_reset_lenght:
                 self.processed_objects[loop] = self.processed_objects[loop][int(len(self.processed_objects[loop]) / 2):]
-                # debug('Buffers LENGHT after trim {0}'.format(len(self.processed_objects[loop])))
+                # BotLogger.debug('Buffers LENGHT after trim {0}'.format(len(self.processed_objects[loop])))
             if not self.first_run:
                 self.pulllimit[loop] = self._calculate_pull_limit(self.cont_num[loop], target=loop)
             self.permcounters[loop] += self.cont_num[loop]
 
-        debug('Sub:{0}, this run:{1}.'
+        BotLogger.info('Sub:{0}, this run:{1}.'
               'Comments:{2}, this run:{3}'
               .format(self.permcounters['submissions'],
                       self.cont_num['submissions'], self.permcounters['comments'],
@@ -805,8 +831,8 @@ class ReddBot:
 
         self.first_run = False
 
-        debug(self.pulllimit['submissions'])
-        debug(self.pulllimit['comments'])
+        BotLogger.debug(self.pulllimit['submissions'])
+        BotLogger.debug(self.pulllimit['comments'])
 
     def _calculate_pull_limit(self, lastpullnum, target):
         """this needs to be done better"""
@@ -837,7 +863,7 @@ class ReddBot:
             if new_submissions_list:
                 self.placeholder_id = new_submissions_list[0].id
         except (praw.errors.APIException, exceptions.HTTPError, exceptions.ConnectionError):
-            log_this('ERROR:Cannot connect to reddit!!!')
+            BotLogger.error('ERROR:Cannot connect to reddit!!!')
         return new_submissions_list
 
     def _contentloop(self, target):
@@ -858,9 +884,9 @@ class ReddBot:
                 try:
                     targeted_submission = reddit_operations.get_submission_by_url(result.url)
                 except (APIException, praw.requests.exceptions.HTTPError, praw.requests.exceptions.ConnectionError):
-                    log_this('ERROR: cant get submission by url, Invalid submission url!?')
+                    BotLogger.error('ERROR: cant get submission by url, Invalid submission url!?')
                     targeted_submission = None
-                debug(result.url)
+                BotLogger.debug(result.url)
                 if targeted_submission:
                         already_watched = False
                         for thread in self.Watched_Threads:
@@ -882,24 +908,16 @@ class ReddBot:
                                 WatchedTreads.savecache()
                                 #send_pm_to_owner("New Watch thread added by: {0} in: {1}".format(str(reply.author), result.url))
                             except AttributeError:
-                                log_this("ERROR: ALL USERS BANNED IN: {}".format(targeted_submission.subreddit))
+                                BotLogger.error("ERROR: ALL USERS BANNED IN: {}".format(targeted_submission.subreddit))
                         else:
-                            debug("THREAD ALREADY WATCHED!")
+                            BotLogger.info("THREAD ALREADY WATCHED!")
 
             if result.msg_for_tweet:
                 reddit_operations.tweet_this(result.msg_for_tweet)
-                debug('New Topic Match in: {}'.format(result.args['dsubmission'].subreddit))
+                BotLogger.info('New Topic Match in: {}'.format(result.args['dsubmission'].subreddit))
 
 
-def log_this(logtext):
-    with open('LOG.txt', 'a') as logfile:
-        logfile.write('{0}: {1}\n'.format(time.ctime(), logtext))
-    debug('Sent to LOG FILE: {}'.format(logtext))
 
-
-def debug(debugtext, level=DEBUG_LEVEL):
-    if level >= 1:
-        print('* {}'.format(debugtext))
 
 
 start_time = time.time()
