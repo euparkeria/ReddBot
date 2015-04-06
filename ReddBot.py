@@ -48,7 +48,7 @@ logging configguration
 BotLogger = logging.getLogger('ReddBot')
 BotLogger.setLevel(logging.DEBUG)
 
-nicelogformat = logging.Formatter(fmt='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+nicelogformat = logging.Formatter(fmt='%(asctime)s - %(levelname)s - %(message)s',
                                   datefmt='%m/%d %I:%M')
 
 ConsoleHandler = logging.StreamHandler()
@@ -196,7 +196,7 @@ class ConfigFiles:
                 redd_data = json.load(f)
                 redd_data['KEYWORDS'] = sorted(redd_data['KEYWORDS'], key=len, reverse=True)
                 redd_data['SRSs'] = [x.lower() for x in redd_data['SRSs']]
-                redd_data['Ignored_Subreddits'] = [x.lower for x in redd_data['Ignored_Subreddits']]
+                redd_data['Ignored_Subreddits'] = [x.lower() for x in redd_data['Ignored_Subreddits']]
                 # redd_data['quotes'] = [''.join(('^', x.replace(" ", " ^"))) for x in redd_data['quotes']]
         except IOError:
             BotLogger.error("Error reading data file")
@@ -437,6 +437,8 @@ class RedditOperations:
         '''get correct object depending on url'''
         return_obj = None
         post_object = reddit_operations.get_post_object(result_url)
+        if str(post_object.subreddit).lower() in botconfig.redd_data['Ignored_Subreddits']:
+            return False
         retry_attemts = username_bank.username_count
 
         for retry in range(retry_attemts):
@@ -899,7 +901,7 @@ class ReddBot:
 
                             if thread.thread_url in result.url:
                                 already_watched = True
-                        if not already_watched and result.subreddit not in botconfig.redd_data['Ignored_Subreddits']:
+                        if not already_watched:
                             try:
                                 reply = reddit_operations.reply_to_url(msg=result.msg_for_reply,
                                                                        result_url=result.url)
