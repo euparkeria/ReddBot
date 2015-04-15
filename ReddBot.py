@@ -25,7 +25,7 @@ watched_subreddit = "+".join(['all'])
 results_limit = 2000
 results_limit_comm = 900
 karma_balance_post_limit = 350
-bot_agent_name = 'Mozilla/5.0 Allahu Akbar Browser v72virgins'
+bot_agent_name = 'TotesMessenger v0.x by /u/justcool393 and /u/cmd-t'
 loop_timer = 60
 secondary_timer = loop_timer * 5
 
@@ -122,7 +122,7 @@ class MaintThread(threading.Thread):
         self.name = name
 
     def run(self):
-        print("Starting " + self.name)
+        BotLogger.info("Starting " + self.name)
         '''Maintanence functions bellow'''
         botconfig.check_for_updated_config()
         WatchedTreads.update_all()
@@ -255,11 +255,11 @@ class QuoteBank:
 
             if self.keyword_matched:
                 keyword_matches_keys = [key for key in keys if '-KEYWORD' in key]
-                BotLogger.error(keyword_matches_keys)
+                BotLogger.info(keyword_matches_keys)
                 quote_to_return = self.quotes_matched[choice(keyword_matches_keys)]
             else:
                 longest_keys = [key for key in keys if len(key) >= len(max(keys, key=len)) - 2]  # all longest
-                BotLogger.error(longest_keys)
+                BotLogger.info(longest_keys)
                 quote_to_return = self.quotes_matched[choice(longest_keys)]
 
         else:
@@ -635,7 +635,7 @@ class WatchedTreads:
 
                 self.already_processed_users.append(author)
         BotLogger.info('Processed {0} new users for thread: {1} User LIST:'.format(new_user_counter, self.thread_url))
-        print([user['username'] + ':' + str(user['karma']) for user in srs_users])
+        BotLogger.info([user['username'] + ':' + str(user['karma']) for user in srs_users])
         return srs_users
 
     def update_graph(self):
@@ -906,7 +906,7 @@ class ReddBot:
                                 reply = reddit_operations.reply_to_url(msg=result.msg_for_reply,
                                                                        result_url=result.url)
                                 thread = WatchedTreads(thread_url=result.url,
-                                                       srs_subreddit=result.subreddit,
+                                                       srs_subreddit=str(result.args['dsubmission'].subreddit),
                                                        srs_author=str(result.args['dsubmission'].author),
                                                        bot_reply_object_id=reply.name,
                                                        bot_reply_body=reply.body,
