@@ -25,7 +25,7 @@ watched_subreddit = "+".join(['all'])
 results_limit = 2000
 results_limit_comm = 900
 karma_balance_post_limit = 350
-bot_agent_name = 'TotesMessenger v0.x by /u/justcool393 and /u/cmd-t'
+bot_agent_name = 'ReddBot v2'
 loop_timer = 60
 secondary_timer = loop_timer * 5
 
