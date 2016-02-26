@@ -1,6 +1,5 @@
 import threading
 import time
-from imgurpython.helpers.error import ImgurClientRateLimitError, ImgurClientError
 import math
 import praw
 import json
@@ -8,9 +7,9 @@ import os
 import pickle
 import re
 import logging
-from pandas import DataFrame
+#from pandas import DataFrame
 from random import choice
-from praw.errors import APIException, ClientException, InvalidCaptcha
+from praw.errors import HTTPException, APIException, ClientException, InvalidCaptcha
 from requests import exceptions
 from twython import Twython
 from twython import TwythonError
@@ -18,14 +17,14 @@ from sqlalchemy import create_engine
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy import Column, Integer, String, Boolean
 from sqlalchemy.orm import sessionmaker, scoped_session
-from imgurpython import ImgurClient
+
 
 
 watched_subreddit = "+".join(['all'])
 results_limit = 2000
 results_limit_comm = 900
-karma_balance_post_limit = 350
-bot_agent_name = 'ReddBot v2'
+karma_balance_post_limit = 500
+bot_agent_name = 'LeninBot v2'
 loop_timer = 60
 secondary_timer = loop_timer * 5
 
@@ -36,7 +35,7 @@ DATAFILE = 'ReddDATA.json'
 '''
 Database configuration
 '''
-engine = create_engine('sqlite:///ReddDatabase.db')
+engine = create_engine('postgresql://IPADDRESS:5432/RedditStalkerDB')
 Base = declarative_base()
 session_factory = sessionmaker(bind=engine)
 Session = scoped_session(session_factory)
@@ -91,13 +90,13 @@ class UsernameBank:
 
 
 class SrsUser(Base):
-    __tablename__ = 'SrsUsers'
+    __tablename__ = 'srsusers'
     id = Column(Integer, primary_key=True, autoincrement=True)
     username = Column(String)
     subreddit = Column(String)
     reddit_id = Column(String, unique=True)
     last_check_date = Column(String)
-    SRS_karma_balance = Column(Integer)
+    srs_karma_balance = Column(Integer)
     invasion_number = Column(Integer)
 
 
@@ -133,7 +132,7 @@ class SocialMedia:
     def __init__(self):
         self.reddit_session = self.connect_to_reddit()
         self.twitter_session = self.connect_to_twitter()
-        self.imgur_client = self.connect_to_imgur()
+        #self.imgur_client = self.connect_to_imgur()
 
     @staticmethod
     def connect_to_reddit():
@@ -150,13 +149,13 @@ class SocialMedia:
         except TwythonError:
             BotLogger.error('Cant authenticate into twitter')
         return t
-
+'''
     @staticmethod
     def connect_to_imgur():
         imgur_client = ImgurClient(botconfig.bot_auth_info['IMGUR_CLIENT_ID'],
                                    botconfig.bot_auth_info['IMGUR_CLIENT_SECRET'])
         return imgur_client
-
+'''
 
 class ConfigFiles:
     def __init__(self):
@@ -274,13 +273,9 @@ class RedditOperations:
         """class SocialMedia should only be needed within this class so init here"""
         self.socmedia = SocialMedia()
 
-    def upload_image(self, image_path):
-        try:
-            image_object = self.socmedia.imgur_client.upload_from_path(path=image_path)
-        except (ImgurClientRateLimitError, ImgurClientError):
-            BotLogger.error('Imgur Rate Limit Exceeded')
-            return False
-        return image_object
+        
+        
+
 
     def login(self, username=''):
         try:
@@ -373,8 +368,7 @@ class RedditOperations:
                     user_srs_karma_balance += usercomment.score
         except (APIException,
                 ClientException,
-                praw.requests.exceptions.HTTPError,
-                praw.requests.exceptions.ConnectionError):
+		praw.errors.NotFound):
             BotLogger.error('Cant get user SRS karma balance!!')
         return user_srs_karma_balance
 
@@ -481,7 +475,7 @@ class RedditOperations:
 
     @staticmethod
     def make_np(link):
-        return link.replace('http://www.reddit.com', 'http://np.reddit.com')
+        return link.replace('www.reddit.com', 'np.reddit.com')
 
     def check_if_user_exists(self, username):
         """
@@ -529,7 +523,7 @@ class WatchedTreads:
         self.graph_image_link = ''
         self.last_parent_post_score = reddit_operations.get_post_attribute(url=self.thread_url, attribute='score')
         self.parent_post_author = reddit_operations.get_post_attribute(url=self.thread_url, attribute='author')
-        self.GraphData = DataFrame(data=[(0, self.last_parent_post_score)], columns=['Min', 'Score'])
+        #self.GraphData = DataFrame(data=[(0, self.last_parent_post_score)], columns=['Min', 'Score'])
 
         #self.draw_graph()
 
@@ -567,7 +561,7 @@ class WatchedTreads:
             stupiduser = SrsUser(username=username,
                                  subreddit=subreddit,
                                  last_check_date=time.time(),
-                                 SRS_karma_balance=srs_karma)
+                                 srs_karma_balance=srs_karma)
             session.add(stupiduser)
 
         session.commit()
@@ -639,8 +633,7 @@ class WatchedTreads:
         return srs_users
 
     def update_graph(self):
-        self.GraphData.loc[len(self.GraphData)] = [(time.time() - self.start_watch_time)/60,
-                                                   self.last_parent_post_score]
+        pass
 
     @staticmethod
     def update_all():
@@ -654,7 +647,7 @@ class WatchedTreads:
         splitted_comment = self.bot_body.split(split_mark, 1)
         srs_users_lines = ''.join(['\n\n* [/u/'
                                    + user['username']
-                                   + '](http://np.reddit.com/u/'
+                                   + '](https://np.reddit.com/u/'
                                    + user['username']
                                    + ') '
                                    + user['tag']
@@ -750,7 +743,7 @@ class MatchedSubmissions:
 
             explanations = ['This thread has been targeted by a *possible* downvote-brigade from **{0}**'
                             .format(brigade_subreddit_link),
-                            'This post was just linked from **{0}** in a *possible* attempt to downvote it.'
+                            'The above post was just linked from **{0}** in a *possible* attempt to downvote it.'
                             .format(brigade_subreddit_link)
                             ]
 
@@ -844,7 +837,7 @@ class ReddBot:
 
     def _calculate_pull_limit(self, lastpullnum, target):
         """this needs to be done better"""
-        add_more = {'submissions': 100, 'comments': 300}   # how many items above last pull number to pull next run
+        add_more = {'submissions': 70, 'comments': 300}   # how many items above last pull number to pull next run
 
         if lastpullnum == 0:
             lastpullnum = results_limit / 2   # in case no new results are returned
