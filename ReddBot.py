@@ -301,8 +301,7 @@ class RedditOperations:
         except (AttributeError,
                 APIException,
                 ClientException,
-                praw.requests.exceptions.HTTPError,
-                praw.requests.exceptions.ConnectionError):
+                HTTPException):
             BotLogger.error("Couldnt get post score")
         return str(value)
 
@@ -347,8 +346,7 @@ class RedditOperations:
 
             except (APIException,
                     ClientException,
-                    praw.requests.exceptions.HTTPError,
-                    praw.requests.exceptions.ConnectionError):
+                    HTTPException):
                 BotLogger.error("couldnt register new username")
         return False
 
@@ -387,8 +385,7 @@ class RedditOperations:
                 if author not in botconfig.bot_auth_info['REDDIT_BOT_USERNAME']:
                     authors_list.append(author)
         except (APIException,
-                praw.requests.exceptions.HTTPError,
-                praw.requests.exceptions.ConnectionError):
+                HTTPException):
             BotLogger.error('couldnt get all authors from thread')
         return authors_list
 
@@ -408,8 +405,7 @@ class RedditOperations:
             if username_bank.current_username != username_bank.defaut_username:
                 self.login(username_bank.defaut_username)
         except (APIException,
-                praw.requests.exceptions.HTTPError,
-                praw.requests.exceptions.ConnectionError):
+                HTTPException):
             BotLogger.error('Cant edit comment')
 
     def get_comments_or_subs(self, placeholder_id='', subreddit=watched_subreddit,
@@ -446,8 +442,7 @@ class RedditOperations:
                     BotLogger.info('NOTICE ADDED to ID:{0}'.format(post_object.id))
                     break
             except (APIException,
-                    praw.requests.exceptions.HTTPError,
-                    praw.requests.exceptions.ConnectionError):
+                    HTTPException):
                 BotLogger.error('{1} is BANNED in:{0}, reloging'.format(post_object.subreddit, username_bank.current_username))
                 self.login()
 
@@ -470,7 +465,7 @@ class RedditOperations:
         """
         try:
             self.socmedia.reddit_session.user.send_message(botconfig.bot_auth_info['REDDIT_PM_TO'], pm_text)
-        except (APIException, praw.requests.exceptions.HTTPError, praw.requests.exceptions.ConnectionError):
+        except (APIException, HttpException):
             BotLogger.error('Cant send pm')
 
     @staticmethod
@@ -884,7 +879,7 @@ class ReddBot:
             if result.msg_for_reply:
                 try:
                     targeted_submission = reddit_operations.get_submission_by_url(result.url)
-                except (APIException, praw.requests.exceptions.HTTPError, praw.requests.exceptions.ConnectionError):
+                except (APIException, HTTPException):
                     BotLogger.error('cant get submission by url, Invalid submission url!?')
                     targeted_submission = None
                 BotLogger.debug(result.url)
