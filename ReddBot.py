@@ -3,22 +3,16 @@ import time
 import math
 import praw
 import json
-import os
 import pickle
 import re
-import logging
-#from pandas import DataFrame
 from random import choice
 from praw.errors import HTTPException, APIException, ClientException, InvalidCaptcha
 from requests import exceptions
 from twython import Twython
 from twython import TwythonError
-from sqlalchemy import create_engine
-from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy import Column, Integer, String, Boolean
-from sqlalchemy.orm import sessionmaker, scoped_session
 
-
+import BotDatabase
+import BotLogging
 
 watched_subreddit = "+".join(['all'])
 results_limit = 2000
@@ -30,37 +24,6 @@ secondary_timer = loop_timer * 5
 
 CACHEFILE = 'reddbot.cache'
 AUTHFILE = 'ReddAUTH.json'
-DATAFILE = 'ReddDATA.json'
-
-'''
-Database configuration
-'''
-engine = create_engine('postgresql://IPADDRESS:5432/RedditStalkerDB')
-Base = declarative_base()
-session_factory = sessionmaker(bind=engine)
-Session = scoped_session(session_factory)
-
-
-'''
-logging configguration
-'''
-BotLogger = logging.getLogger('ReddBot')
-BotLogger.setLevel(logging.DEBUG)
-
-nicelogformat = logging.Formatter(fmt='%(asctime)s - %(levelname)s - %(message)s',
-                                  datefmt='%m/%d %I:%M')
-
-ConsoleHandler = logging.StreamHandler()
-ConsoleHandler.setLevel(logging.INFO)
-ConsoleHandler.setFormatter(nicelogformat)
-
-FileHandler = logging.FileHandler(filename='log.txt')
-FileHandler.setLevel(logging.WARNING)
-FileHandler.setFormatter(nicelogformat)
-
-
-BotLogger.addHandler(ConsoleHandler)
-BotLogger.addHandler(FileHandler)
 
 
 class UsernameBank:
@@ -89,29 +52,6 @@ class UsernameBank:
         self.already_tried = []
 
 
-class SrsUser(Base):
-    __tablename__ = 'srsusers'
-    id = Column(Integer, primary_key=True, autoincrement=True)
-    username = Column(String)
-    subreddit = Column(String)
-    reddit_id = Column(String, unique=True)
-    last_check_date = Column(String)
-    srs_karma_balance = Column(Integer)
-    invasion_number = Column(Integer)
-
-
-class BotAccounts(Base):
-    __tablename__ = 'BotAccounts'
-    id = Column(Integer, primary_key=True, autoincrement=True)
-    username = Column(String, unique=True)
-    reddit_id = Column(String, unique=True)
-    password = Column(String)
-    last_check_date = Column(String)
-    ShadowBanned = Column(Boolean)
-
-#Base.metadata.create_all(engine)
-
-
 class MaintThread(threading.Thread):
     """Separate thread for the Maintanance functions"""
 
@@ -121,7 +61,7 @@ class MaintThread(threading.Thread):
         self.name = name
 
     def run(self):
-        BotLogger.info("Starting " + self.name)
+        BotLogging.BotLogger.info("Starting " + self.name)
         '''Maintanence functions bellow'''
         botconfig.check_for_updated_config()
         WatchedTreads.update_all()
@@ -147,7 +87,7 @@ class SocialMedia:
                         botconfig.bot_auth_info['OAUTH_TOKEN'],
                         botconfig.bot_auth_info['OAUTH_TOKEN_SECRET'])
         except TwythonError:
-            BotLogger.error('Cant authenticate into twitter')
+            BotLogging.BotLogger.error('Cant authenticate into twitter')
         return t
 '''
     @staticmethod
@@ -156,6 +96,7 @@ class SocialMedia:
                                    botconfig.bot_auth_info['IMGUR_CLIENT_SECRET'])
         return imgur_client
 '''
+
 
 class ConfigFiles:
     def __init__(self):
@@ -167,11 +108,10 @@ class ConfigFiles:
         self.check_for_updated_config()
 
     def check_for_updated_config(self):
-        if os.stat(DATAFILE).st_mtime > self.data_modified_time:
-            self.redd_data = self.readdatafile()
-            self.bot_auth_info = self.readauthfile()
-            BotLogger.info('CONFIG FILES RELOADED!')
-            return True
+        self.redd_data = self.readdatafile()
+        self.bot_auth_info = self.readauthfile()
+        BotLogging.BotLogger.info('CONFIG FILES RELOADED!')
+        
 
     @staticmethod
     def readauthfile():
@@ -185,20 +125,17 @@ class ConfigFiles:
             with open(CACHEFILE, 'rb') as f:
                 return pickle.load(f)
         except IOError:
-            BotLogger.info('Cache File not Pressent')
+            BotLogging.BotLogger.info('Cache File not Pressent')
             return []
 
     def readdatafile(self):
-        try:
-            self.data_modified_time = os.stat(DATAFILE).st_mtime
-            with open(DATAFILE, 'r', encoding='utf-8') as f:
-                redd_data = json.load(f)
-                redd_data['KEYWORDS'] = sorted(redd_data['KEYWORDS'], key=len, reverse=True)
-                redd_data['SRSs'] = [x.lower() for x in redd_data['SRSs']]
-                redd_data['Ignored_Subreddits'] = [x.lower() for x in redd_data['Ignored_Subreddits']]
-                # redd_data['quotes'] = [''.join(('^', x.replace(" ", " ^"))) for x in redd_data['quotes']]
-        except IOError:
-            BotLogger.error("Error reading data file")
+
+        redd_data = BotDatabase.get_from_db()
+
+        redd_data['KEYWORDS'] = sorted(redd_data['KEYWORDS'], key=len, reverse=True)
+        redd_data['SRSs'] = [x.lower() for x in redd_data['SRSs']]
+        # redd_data['quotes'] = [''.join(('^', x.replace(" ", " ^"))) for x in redd_data['quotes']]
+
         return redd_data
 
 
@@ -254,11 +191,11 @@ class QuoteBank:
 
             if self.keyword_matched:
                 keyword_matches_keys = [key for key in keys if '-KEYWORD' in key]
-                BotLogger.info(keyword_matches_keys)
+                BotLogging.BotLogger.info(keyword_matches_keys)
                 quote_to_return = self.quotes_matched[choice(keyword_matches_keys)]
             else:
                 longest_keys = [key for key in keys if len(key) >= len(max(keys, key=len)) - 2]  # all longest
-                BotLogger.info(longest_keys)
+                BotLogging.BotLogger.info(longest_keys)
                 quote_to_return = self.quotes_matched[choice(longest_keys)]
 
         else:
@@ -283,10 +220,10 @@ class RedditOperations:
                 username = username_bank.get_username()
             self.socmedia.reddit_session.login(username, botconfig.bot_auth_info['REDDIT_BOT_PASSWORD'])
             username_bank.current_username = username
-            BotLogger.info('Sucessfully logged in as {0}'.format(username_bank.current_username))
+            BotLogging.BotLogger.info('Sucessfully logged in as {0}'.format(username_bank.current_username))
             time.sleep(3)
         except praw.errors.APIException:
-            BotLogger.error('Cant login to Reddit.com')
+            BotLogging.BotLogger.error('Cant login to Reddit.com')
 
     def get_post_attribute(self, url, attribute):
         """returns a post attribute as a string
@@ -302,7 +239,7 @@ class RedditOperations:
                 APIException,
                 ClientException,
                 HTTPException):
-            BotLogger.error("Couldnt get post score")
+            BotLogging.BotLogger.error("Couldnt get post score")
         return str(value)
 
     def get_post_object(self, url):
@@ -317,38 +254,6 @@ class RedditOperations:
             return post_object.comments[0]
         else:
             return post_object
-
-    def register_new_username(self, username, password, captcha=None):
-        """
-        :param username:
-        :param password:
-        :param captcha:
-        :return:
-        """
-        retry_attempts = 3
-        captcha_id = ''
-        failed_captcha = False
-        if failed_captcha and captcha_id:
-            captcha = {'iden': captcha_id, 'captcha': ''}
-
-        for retry in range(retry_attempts):
-            try:
-                self.socmedia.reddit_session.create_redditor(user_name=username,
-                                                             password=password,
-                                                             captcha=captcha,
-                                                             raise_captcha_exception=True)
-                return True
-
-            except InvalidCaptcha as e:
-                captcha_id = e.response['captcha']
-                failed_captcha = True
-                BotLogger.error("Failed: CAPTCHA CHALLENGE:{}".format(captcha_id))
-
-            except (APIException,
-                    ClientException,
-                    HTTPException):
-                BotLogger.error("couldnt register new username")
-        return False
 
     def get_user_karma_balance(self, author, in_subreddit, user_comments_limit=karma_balance_post_limit):
         """
@@ -367,7 +272,7 @@ class RedditOperations:
         except (APIException,
                 ClientException,
 		praw.errors.NotFound):
-            BotLogger.error('Cant get user SRS karma balance!!')
+            BotLogging.BotLogger.error('Cant get user SRS karma balance!!')
         return user_srs_karma_balance
 
     def get_authors_in_thread(self, url):
@@ -386,7 +291,7 @@ class RedditOperations:
                     authors_list.append(author)
         except (APIException,
                 HTTPException):
-            BotLogger.error('couldnt get all authors from thread')
+            BotLogging.BotLogger.error('couldnt get all authors from thread')
         return authors_list
 
     def edit_comment(self, comment_id, comment_body, poster_username):
@@ -401,12 +306,12 @@ class RedditOperations:
         try:
             comment = self.socmedia.reddit_session.get_info(thing_id=comment_id)
             comment.edit(comment_body)
-            BotLogger.info('Comment : {} edited.'.format(comment_id))
+            BotLogging.BotLogger.info('Comment : {} edited.'.format(comment_id))
             if username_bank.current_username != username_bank.defaut_username:
                 self.login(username_bank.defaut_username)
         except (APIException,
                 HTTPException):
-            BotLogger.error('Cant edit comment')
+            BotLogging.BotLogger.error('Cant edit comment')
 
     def get_comments_or_subs(self, placeholder_id='', subreddit=watched_subreddit,
                              limit=results_limit, target='submissions'):
@@ -427,23 +332,22 @@ class RedditOperations:
         '''get correct object depending on url'''
         return_obj = None
         post_object = reddit_operations.get_post_object(result_url)
-        if str(post_object.subreddit).lower() in botconfig.redd_data['Ignored_Subreddits']:
-            return False
+
         retry_attemts = username_bank.username_count
 
         for retry in range(retry_attemts):
             try:
                 if isinstance(post_object, praw.objects.Comment):
                     return_obj = post_object.reply(msg)
-                    BotLogger.info('NOTICE REPLIED to ID:{0}'.format(post_object.id))
+                    BotLogging.BotLogger.info('NOTICE REPLIED to ID:{0}'.format(post_object.id))
                     break
                 elif isinstance(post_object, praw.objects.Submission):
                     return_obj = post_object.add_comment(msg)
-                    BotLogger.info('NOTICE ADDED to ID:{0}'.format(post_object.id))
+                    BotLogging.BotLogger.info('NOTICE ADDED to ID:{0}'.format(post_object.id))
                     break
             except (APIException,
                     HTTPException):
-                BotLogger.error('{1} is BANNED in:{0}, reloging'.format(post_object.subreddit, username_bank.current_username))
+                BotLogging.BotLogger.error('{1} is BANNED in:{0}, reloging'.format(post_object.subreddit, username_bank.current_username))
                 self.login()
 
         if username_bank.current_username != username_bank.defaut_username:
@@ -465,8 +369,8 @@ class RedditOperations:
         """
         try:
             self.socmedia.reddit_session.user.send_message(botconfig.bot_auth_info['REDDIT_PM_TO'], pm_text)
-        except (APIException, HttpException):
-            BotLogger.error('Cant send pm')
+        except (APIException, HTTPException):
+            BotLogging.BotLogger.error('Cant send pm')
 
     @staticmethod
     def make_np(link):
@@ -481,13 +385,12 @@ class RedditOperations:
         user = None
         try:
             user = self.socmedia.reddit_session.get_redditor(username)
-        except praw.requests.exceptions.HTTPError as e:
-            if e.response.status_code == 404:
+        except HTTPException as e:
+            if e.message.status_code == 404:
                 return False
         except (APIException,
-                praw.requests.exceptions.HTTPError,
-                praw.requests.exceptions.ConnectionError):
-            BotLogger.error('Error checking if user exists')
+                HTTPException):
+            BotLogging.BotLogger.error('Error checking if user exists')
         if user:
             return True
         return False
@@ -495,12 +398,12 @@ class RedditOperations:
     def tweet_this(self, msg):
         if len(msg) > 140:
             msg = msg[:139]
-            BotLogger.error('MSG exceeding 140 characters!!')
+            BotLogging.BotLogger.error('MSG exceeding 140 characters!!')
         try:
             self.socmedia.twitter_session.update_status(status=msg)
-            BotLogger.info('TWEET SENT!!!')
+            BotLogging.BotLogger.info('TWEET SENT!!!')
         except TwythonError:
-            BotLogger.error('couldnt update twitter status')
+            BotLogging.BotLogger.error('couldnt update twitter status')
 
 
 class WatchedTreads:
@@ -518,9 +421,7 @@ class WatchedTreads:
         self.graph_image_link = ''
         self.last_parent_post_score = reddit_operations.get_post_attribute(url=self.thread_url, attribute='score')
         self.parent_post_author = reddit_operations.get_post_attribute(url=self.thread_url, attribute='author')
-        #self.GraphData = DataFrame(data=[(0, self.last_parent_post_score)], columns=['Min', 'Score'])
 
-        #self.draw_graph()
 
     @staticmethod
     def savecache():
@@ -528,7 +429,7 @@ class WatchedTreads:
             with open(CACHEFILE, 'wb') as fa:
                 pickle.dump(bot1.Watched_Threads, fa)
         except IOError:
-            BotLogger.error('Cant write cache file')
+            BotLogging.BotLogger.error('Cant write cache file')
 
     @staticmethod
     def update_user_database(username, subreddit, srs_karma):
@@ -538,7 +439,7 @@ class WatchedTreads:
         :param srs_karma:
         :return:
         """
-        session = Session()
+        session = BotDatabase.Session()
         users_query = WatchedTreads.query_user_database(username, subreddit, session=session)
         invasion_number = 0
 
@@ -550,18 +451,18 @@ class WatchedTreads:
                 users_query.invasion_number = 1
             users_query.last_check_date = time.time()
             users_query.SRS_karma_balance = srs_karma
-            BotLogger.info("Updating database entry on: {1}@{0} !".format(subreddit, username))
+            BotLogging.BotLogger.info("Updating database entry on: {1}@{0} !".format(subreddit, username))
         else:
-            BotLogger.info("{1}@{0} NOT IN database!".format(subreddit, username))
-            stupiduser = SrsUser(username=username,
-                                 subreddit=subreddit,
-                                 last_check_date=time.time(),
-                                 srs_karma_balance=srs_karma)
+            BotLogging.BotLogger.info("{1}@{0} NOT IN database!".format(subreddit, username))
+            stupiduser = BotDatabase.SrsUser(username=username,
+                                             subreddit=subreddit,
+                                             last_check_date=time.time(),
+                                             srs_karma_balance=srs_karma)
             session.add(stupiduser)
 
         session.commit()
-        Session.remove()
-        BotLogger.info('Database Updated')
+        BotDatabase.Session.remove()
+        BotLogging.BotLogger.info('Database Updated')
         return invasion_number
 
     @staticmethod
@@ -569,11 +470,11 @@ class WatchedTreads:
         """Will return False if user doesnt exist, if no session is give as argument will open and close it's own"""
         no_session_argument = False
         if not session:
-            session = Session()
+            session = BotDatabase.Session()
             no_session_argument = True
-        users_query = session.query(SrsUser).filter_by(username=username, subreddit=subreddit).first()
+        users_query = session.query(BotDatabase.SrsUser).filter_by(username=username, subreddit=subreddit).first()
         if no_session_argument:
-            Session.remove()
+            BotDatabase.Session.remove()
         if users_query:
             return users_query
         else:
@@ -601,7 +502,7 @@ class WatchedTreads:
                                            poster_username=self.poster_username)
 
         if self.check_if_expired():
-            BotLogger.info('This Thread has Expired and is Removed! {0} '.format(self.thread_url))
+            BotLogging.BotLogger.info('This Thread has Expired and is Removed! {0} '.format(self.thread_url))
 
     def check_for_new_invaders(self):
         karma_upper_limit = 5  # if poster has more than that amount of karma in the srs subreddit he is added
@@ -623,8 +524,8 @@ class WatchedTreads:
                         srs_users[-1]['tag'] = int(round((math.log(invasion_number, 1.902) - 1.5))) * '☠'
 
                 self.already_processed_users.append(author)
-        BotLogger.info('Processed {0} new users for thread: {1} User LIST:'.format(new_user_counter, self.thread_url))
-        BotLogger.info([user['username'] + ':' + str(user['karma']) for user in srs_users])
+        BotLogging.BotLogger.info('Processed {0} new users for thread: {1} User LIST:'.format(new_user_counter, self.thread_url))
+        BotLogging.BotLogger.info([user['username'] + ':' + str(user['karma']) for user in srs_users])
         return srs_users
 
     def update_graph(self):
@@ -632,7 +533,7 @@ class WatchedTreads:
 
     @staticmethod
     def update_all():
-        BotLogger.info('Currently Watching {} threads.'.format(len(bot1.Watched_Threads)))
+        BotLogging.BotLogger.info('Currently Watching {} threads.'.format(len(bot1.Watched_Threads)))
         for thread in bot1.Watched_Threads:
             thread.update()
         WatchedTreads.savecache()
@@ -651,7 +552,7 @@ class WatchedTreads:
 
     def check_if_expired(self):
             time_watched = time.time() - self.start_watch_time
-            BotLogger.info('{0} Watched for {1} hours'.format(self.thread_url, time_watched/60/60))
+            BotLogging.BotLogger.info('{0} Watched for {1} hours'.format(self.thread_url, time_watched/60/60))
             if time_watched > self.keep_alive:  # if older than 8 hours
                 bot1.Watched_Threads.remove(self)
                 return True
@@ -814,12 +715,12 @@ class ReddBot:
             buffer_reset_lenght = self.pulllimit[loop] * 10
             if len(self.processed_objects[loop]) >= buffer_reset_lenght:
                 self.processed_objects[loop] = self.processed_objects[loop][int(len(self.processed_objects[loop]) / 2):]
-                # BotLogger.debug('Buffers LENGHT after trim {0}'.format(len(self.processed_objects[loop])))
+                # BotLogging.BotLogger.debug('Buffers LENGHT after trim {0}'.format(len(self.processed_objects[loop])))
             if not self.first_run:
                 self.pulllimit[loop] = self._calculate_pull_limit(self.cont_num[loop], target=loop)
             self.permcounters[loop] += self.cont_num[loop]
 
-        BotLogger.info('Sub:{0}, this run:{1}.'
+        BotLogging.BotLogger.info('Sub:{0}, this run:{1}.'
               'Comments:{2}, this run:{3}'
               .format(self.permcounters['submissions'],
                       self.cont_num['submissions'], self.permcounters['comments'],
@@ -827,8 +728,8 @@ class ReddBot:
 
         self.first_run = False
 
-        BotLogger.debug(self.pulllimit['submissions'])
-        BotLogger.debug(self.pulllimit['comments'])
+        BotLogging.BotLogger.debug(self.pulllimit['submissions'])
+        BotLogging.BotLogger.debug(self.pulllimit['comments'])
 
     def _calculate_pull_limit(self, lastpullnum, target):
         """this needs to be done better"""
@@ -859,7 +760,7 @@ class ReddBot:
             if new_submissions_list:
                 self.placeholder_id = new_submissions_list[0].id
         except (praw.errors.APIException, exceptions.HTTPError, exceptions.ConnectionError):
-            BotLogger.error('Cannot connect to reddit!!!')
+            BotLogging.BotLogger.error('Cannot connect to reddit!!!')
         return new_submissions_list
 
     def _contentloop(self, target):
@@ -880,9 +781,9 @@ class ReddBot:
                 try:
                     targeted_submission = reddit_operations.get_submission_by_url(result.url)
                 except (APIException, HTTPException):
-                    BotLogger.error('cant get submission by url, Invalid submission url!?')
+                    BotLogging.BotLogger.error('cant get submission by url, Invalid submission url!?')
                     targeted_submission = None
-                BotLogger.debug(result.url)
+                BotLogging.BotLogger.debug(result.url)
                 if targeted_submission:
                         already_watched = False
                         for thread in self.Watched_Threads:
@@ -904,16 +805,13 @@ class ReddBot:
                                 WatchedTreads.savecache()
                                 #send_pm_to_owner("New Watch thread added by: {0} in: {1}".format(str(reply.author), result.url))
                             except AttributeError:
-                                BotLogger.error("ALL USERS BANNED IN: {}".format(targeted_submission.subreddit))
+                                BotLogging.BotLogger.error("ALL USERS BANNED IN: {}".format(targeted_submission.subreddit))
                         else:
-                            BotLogger.info("THREAD ALREADY WATCHED!")
+                            BotLogging.BotLogger.info("THREAD ALREADY WATCHED!")
 
             if result.msg_for_tweet:
                 reddit_operations.tweet_this(result.msg_for_tweet)
-                BotLogger.info('New Topic Match in: {}'.format(result.args['dsubmission'].subreddit))
-
-
-
+                BotLogging.BotLogger.info('New Topic Match in: {}'.format(result.args['dsubmission'].subreddit))
 
 
 start_time = time.time()
