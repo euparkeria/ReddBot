@@ -360,6 +360,8 @@ class RedditOperations:
         :param url:
         :return:
         """
+
+        url = url.replace("www.np.", "np.")
         return self.socmedia.reddit_session.get_submission(url)
 
     def send_pm_to_owner(self, pm_text):
