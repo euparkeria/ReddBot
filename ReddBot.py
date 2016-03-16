@@ -132,13 +132,14 @@ class ConfigFiles:
 
         redd_data = BotDatabase.get_from_db()
         if redd_data:
-            with open(DATACACHE, 'w') as outfile:
+            with open(DATACACHE, 'w', encoding='utf-8') as outfile:
                 json.dump(redd_data, outfile)
-
+        else:
+            with open(DATACACHE, 'r', encoding='utf-8') as f:
+                redd_data = json.load(f)
 
         redd_data['KEYWORDS'] = sorted(redd_data['KEYWORDS'], key=len, reverse=True)
         redd_data['SRSs'] = [x.lower() for x in redd_data['SRSs']]
-        # redd_data['quotes'] = [''.join(('^', x.replace(" ", " ^"))) for x in redd_data['quotes']]
 
         return redd_data
 
@@ -208,13 +209,14 @@ class QuoteBank:
         session = BotDatabase.Session()
 
         quote_query = session.query(BotDatabase.BotQuotes).filter_by(quote=quote_to_return).first()
-        BotLogging.BotLogger.info(quote_to_return)
-        BotLogging.BotLogger.info(quote_query)
         if quote_query:
             if quote_query.usedcount:
                 quote_query.usedcount += 1
             else:
                 quote_query.usedcount = 1
+        session.commit()
+        BotDatabase.Session.remove()
+        BotLogging.BotLogger.info('Quote Counter Updated')
 
         return ''.join(('^', quote_to_return.replace(" ", " ^")))
 
