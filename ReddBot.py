@@ -24,6 +24,7 @@ secondary_timer = loop_timer * 5
 
 CACHEFILE = 'reddbot.cache'
 AUTHFILE = 'ReddAUTH.json'
+DATACACHE = 'DataCACHE.json'
 
 
 class UsernameBank:
@@ -111,7 +112,6 @@ class ConfigFiles:
         self.redd_data = self.readdatafile()
         self.bot_auth_info = self.readauthfile()
         BotLogging.BotLogger.info('CONFIG FILES RELOADED!')
-        
 
     @staticmethod
     def readauthfile():
@@ -131,6 +131,10 @@ class ConfigFiles:
     def readdatafile(self):
 
         redd_data = BotDatabase.get_from_db()
+        if redd_data:
+            with open(DATACACHE, 'w') as outfile:
+                json.dump(redd_data, outfile)
+
 
         redd_data['KEYWORDS'] = sorted(redd_data['KEYWORDS'], key=len, reverse=True)
         redd_data['SRSs'] = [x.lower() for x in redd_data['SRSs']]
@@ -222,10 +226,6 @@ class RedditOperations:
         """class SocialMedia should only be needed within this class so init here"""
         self.socmedia = SocialMedia()
 
-        
-        
-
-
     def login(self, username=''):
         try:
             if not username:
@@ -283,7 +283,7 @@ class RedditOperations:
                     user_srs_karma_balance += usercomment.score
         except (APIException,
                 ClientException,
-		praw.errors.NotFound):
+                praw.errors.NotFound):
             BotLogging.BotLogger.error('Cant get user SRS karma balance!!')
         return user_srs_karma_balance
 
