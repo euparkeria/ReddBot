@@ -200,7 +200,18 @@ class QuoteBank:
 
         else:
             quote_to_return = choice(quotes)
-        
+
+        session = BotDatabase.Session()
+
+        quote_query = session.query(BotDatabase.BotQuotes).filter_by(quote=quote_to_return).first()
+        BotLogging.BotLogger.info(quote_to_return)
+        BotLogging.BotLogger.info(quote_query)
+        if quote_query:
+            if quote_query.usedcount:
+                quote_query.usedcount += 1
+            else:
+                quote_query.usedcount = 1
+
         return ''.join(('^', quote_to_return.replace(" ", " ^")))
 
 
