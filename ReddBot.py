@@ -8,6 +8,7 @@ import re
 from random import choice
 from praw.errors import HTTPException, APIException, ClientException, InvalidCaptcha
 from requests import exceptions
+from sqlalchemy.exc import SQLAlchemyError
 from twython import Twython
 from twython import TwythonError
 
@@ -206,17 +207,19 @@ class QuoteBank:
         else:
             quote_to_return = choice(quotes)
 
-        session = BotDatabase.Session()
-
-        quote_query = session.query(BotDatabase.BotQuotes).filter_by(quote=quote_to_return).first()
-        if quote_query:
-            if quote_query.usedcount:
-                quote_query.usedcount += 1
-            else:
-                quote_query.usedcount = 1
-        session.commit()
-        BotDatabase.Session.remove()
-        BotLogging.BotLogger.info('Quote Counter Updated')
+        try:
+            session = BotDatabase.Session()
+            quote_query = session.query(BotDatabase.BotQuotes).filter_by(quote=quote_to_return).first()
+            if quote_query:
+                if quote_query.usedcount:
+                    quote_query.usedcount += 1
+                else:
+                    quote_query.usedcount = 1
+            session.commit()
+            BotDatabase.Session.remove()
+            BotLogging.BotLogger.info('Quote Counter Updated')
+        except SQLAlchemyError:
+            BotLogging.BotLogger.error("Error updating quote database")
 
         return ''.join(('^', quote_to_return.replace(" ", " ^")))
 
@@ -455,46 +458,53 @@ class WatchedTreads:
         :param srs_karma:
         :return:
         """
-        session = BotDatabase.Session()
-        users_query = WatchedTreads.query_user_database(username, subreddit, session=session)
         invasion_number = 0
+        try:
+            session = BotDatabase.Session()
+            users_query = WatchedTreads.query_user_database(username, subreddit, session=session)
 
-        if users_query:
-            if users_query.invasion_number:
-                users_query.invasion_number += 1
-                invasion_number = users_query.invasion_number
+            if users_query:
+                if users_query.invasion_number:
+                    users_query.invasion_number += 1
+                    invasion_number = users_query.invasion_number
+                else:
+                    users_query.invasion_number = 1
+                users_query.last_check_date = time.time()
+                users_query.SRS_karma_balance = srs_karma
+                BotLogging.BotLogger.info("Updating database entry on: {1}@{0} !".format(subreddit, username))
             else:
-                users_query.invasion_number = 1
-            users_query.last_check_date = time.time()
-            users_query.SRS_karma_balance = srs_karma
-            BotLogging.BotLogger.info("Updating database entry on: {1}@{0} !".format(subreddit, username))
-        else:
-            BotLogging.BotLogger.info("{1}@{0} NOT IN database!".format(subreddit, username))
-            stupiduser = BotDatabase.SrsUser(username=username,
-                                             subreddit=subreddit,
-                                             last_check_date=time.time(),
-                                             srs_karma_balance=srs_karma)
-            session.add(stupiduser)
+                BotLogging.BotLogger.info("{1}@{0} NOT IN database!".format(subreddit, username))
+                stupiduser = BotDatabase.SrsUser(username=username,
+                                                 subreddit=subreddit,
+                                                 last_check_date=time.time(),
+                                                 srs_karma_balance=srs_karma)
+                session.add(stupiduser)
 
-        session.commit()
-        BotDatabase.Session.remove()
-        BotLogging.BotLogger.info('Database Updated')
+            session.commit()
+            BotDatabase.Session.remove()
+            BotLogging.BotLogger.info('Database Updated')
+
+        except SQLAlchemyError:
+            BotLogging.BotLogger.error("Error updating user database")
         return invasion_number
 
     @staticmethod
     def query_user_database(username, subreddit, session=None):
         """Will return False if user doesnt exist, if no session is give as argument will open and close it's own"""
         no_session_argument = False
-        if not session:
-            session = BotDatabase.Session()
-            no_session_argument = True
-        users_query = session.query(BotDatabase.SrsUser).filter_by(username=username, subreddit=subreddit).first()
-        if no_session_argument:
-            BotDatabase.Session.remove()
-        if users_query:
-            return users_query
-        else:
-            return False
+        try:
+            if not session:
+                session = BotDatabase.Session()
+                no_session_argument = True
+            users_query = session.query(BotDatabase.SrsUser).filter_by(username=username, subreddit=subreddit).first()
+            if no_session_argument:
+                BotDatabase.Session.remove()
+            if users_query:
+                return users_query
+            else:
+                return False
+        except SQLAlchemyError:
+            BotLogging.BotLogger.error("Error querying user database")
 
     def update(self):
         bot_comment_changed = False
