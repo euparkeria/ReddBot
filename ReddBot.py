@@ -6,7 +6,9 @@ import json
 import pickle
 import re
 from random import choice
-from praw.errors import HTTPException, APIException, ClientException, InvalidCaptcha
+
+import psycopg2
+from praw.errors import HTTPException, APIException, ClientException
 from requests import exceptions
 from sqlalchemy.exc import SQLAlchemyError
 from twython import Twython
@@ -19,7 +21,7 @@ watched_subreddit = "+".join(['all'])
 results_limit = 2000
 results_limit_comm = 900
 karma_balance_post_limit = 500
-bot_agent_name = 'LeninBot v2'
+bot_agent_name = 'LeninComrade v2'
 loop_timer = 60
 secondary_timer = loop_timer * 5
 
@@ -66,15 +68,15 @@ class MaintThread(threading.Thread):
         BotLogging.BotLogger.info("Starting " + self.name)
         '''Maintanence functions bellow'''
         botconfig.check_for_updated_config()
-        WatchedTreads.update_all()
+        WatchedThreads.update_all()
 
 
 class SocialMedia:
     """handles reddit and twiter API init and sessions"""
+
     def __init__(self):
         self.reddit_session = self.connect_to_reddit()
         self.twitter_session = self.connect_to_twitter()
-        #self.imgur_client = self.connect_to_imgur()
 
     @staticmethod
     def connect_to_reddit():
@@ -83,6 +85,7 @@ class SocialMedia:
 
     @staticmethod
     def connect_to_twitter():
+        t = False
         try:
             t = Twython(botconfig.bot_auth_info['APP_KEY'],
                         botconfig.bot_auth_info['APP_SECRET'],
@@ -91,6 +94,8 @@ class SocialMedia:
         except TwythonError:
             BotLogging.BotLogger.error('Cant authenticate into twitter')
         return t
+
+
 '''
     @staticmethod
     def connect_to_imgur():
@@ -183,7 +188,8 @@ class QuoteBank:
 
             if match:
                 match_word_list = match.split()
-                if match_word_list and len(max(match_word_list, key=len)) >= 6:  # if there is a word of at least 6 characters
+                if match_word_list and len(
+                        max(match_word_list, key=len)) >= 6:  # if there is a word of at least 6 characters
 
                     for keyword in botconfig.redd_data['KEYWORDS']:
                         if self.lcs(keyword.lower(), match.lower()) in botconfig.redd_data['KEYWORDS']:
@@ -218,7 +224,7 @@ class QuoteBank:
             session.commit()
             BotDatabase.Session.remove()
             BotLogging.BotLogger.info('Quote Counter Updated')
-        except SQLAlchemyError:
+        except (SQLAlchemyError, psycopg2.OperationalError):
             BotLogging.BotLogger.error("Error updating quote database")
 
         return ''.join(('^', quote_to_return.replace(" ", " ^")))
@@ -265,7 +271,8 @@ class RedditOperations:
         :param url:
         """
         post_object = self.get_submission_by_url(url=url)
-        comment_url_pattern = re.compile("http[s]?://[a-z]{0,3}\.?[a-z]{0,2}\.?reddit\.com/r/.{1,20}/comments/.{6,8}/.*/.{6,8}")
+        comment_url_pattern = re.compile(
+            "http[s]?://[a-z]{0,3}\.?[a-z]{0,2}\.?reddit\.com/r/.{1,20}/comments/.{6,8}/.*/.{6,8}")
 
         if comment_url_pattern.match(url):
             return post_object.comments[0]
@@ -288,28 +295,27 @@ class RedditOperations:
                     user_srs_karma_balance += usercomment.score
         except (APIException,
                 ClientException,
-                praw.errors.NotFound):
+                praw.errors.NotFound,
+                praw.errors.Forbidden):
             BotLogging.BotLogger.error('Cant get user SRS karma balance!!')
         return user_srs_karma_balance
 
-    def get_authors_in_thread(self, url):
+    def get_comments_in_thread(self, url):
         """
         returns list of usernames writting in a thread by url
         :param url:
         :return:
         """
-        authors_list = []
+        comments_list = []
         try:
             submission = self.get_submission_by_url(url)
             submission.replace_more_comments(limit=None, threshold=1)
             for comment in praw.helpers.flatten_tree(submission.comments):
-                author = str(comment.author)
-                if author not in botconfig.bot_auth_info['REDDIT_BOT_USERNAME']:
-                    authors_list.append(author)
+                comments_list.append(comment)
         except (APIException,
                 HTTPException):
             BotLogging.BotLogger.error('couldnt get all authors from thread')
-        return authors_list
+        return comments_list
 
     def edit_comment(self, comment_id, comment_body, poster_username):
         """
@@ -364,7 +370,8 @@ class RedditOperations:
                     break
             except (APIException,
                     HTTPException):
-                BotLogging.BotLogger.error('{1} is BANNED in:{0}, reloging'.format(post_object.subreddit, username_bank.current_username))
+                BotLogging.BotLogger.error(
+                    '{1} is BANNED in:{0}, reloging'.format(post_object.subreddit, username_bank.current_username))
                 self.login()
 
         if username_bank.current_username != username_bank.defaut_username:
@@ -378,7 +385,8 @@ class RedditOperations:
         :return:
         """
 
-        url = url.replace("www.np.", "np.") # in case someone types www.np which does not match the ssl cert
+        url = url.replace("www.np.", "np.")  # in case someone types www.np which does not match the ssl cert
+        url = url.replace("http://", "https://")
         return self.socmedia.reddit_session.get_submission(url)
 
     def send_pm_to_owner(self, pm_text):
@@ -425,22 +433,34 @@ class RedditOperations:
             BotLogging.BotLogger.error('couldnt update twitter status')
 
 
-class WatchedTreads:
-
-    def __init__(self, thread_url, srs_subreddit, srs_author, bot_reply_object_id, bot_reply_body, poster_username):
+class WatchedThreads:
+    def __init__(self, thread_url, srs_subreddit, srs_author, bot_reply_object_fullname, bot_reply_object_id,
+                 bot_reply_body, poster_username, thread_permalink):
         self.thread_url = thread_url
+        self.thread_permalink = thread_permalink
         self.srs_subreddit = srs_subreddit
         self.srs_author = srs_author
         self.start_watch_time = time.time()
         self.already_processed_users = []
+        self.bot_reply_object_fullname = bot_reply_object_fullname
         self.bot_reply_object_id = bot_reply_object_id
         self.bot_body = bot_reply_body
         self.poster_username = poster_username
-        self.keep_alive = 43200  # time to watch a thread in seconds
-        self.graph_image_link = ''
+        self.keep_alive = 86400  # time to watch a thread in seconds
         self.last_parent_post_score = reddit_operations.get_post_attribute(url=self.thread_url, attribute='score')
         self.parent_post_author = reddit_operations.get_post_attribute(url=self.thread_url, attribute='author')
 
+        self.already_read_replies_ids = []
+
+    def check_for_bot_comment_replies(self, comments_in_thread):
+        replies_to_bot = []
+
+        for comment in comments_in_thread:
+            if comment.parent_id == self.bot_reply_object_fullname and comment.name not in self.already_read_replies_ids:
+                replies_to_bot.append(comment)
+                self.already_read_replies_ids.append(comment.name)
+
+        return replies_to_bot
 
     @staticmethod
     def savecache():
@@ -461,7 +481,7 @@ class WatchedTreads:
         invasion_number = 0
         try:
             session = BotDatabase.Session()
-            users_query = WatchedTreads.query_user_database(username, subreddit, session=session)
+            users_query = WatchedThreads.query_user_database(username, subreddit, session=session)
 
             if users_query:
                 if users_query.invasion_number:
@@ -484,7 +504,7 @@ class WatchedTreads:
             BotDatabase.Session.remove()
             BotLogging.BotLogger.info('Database Updated')
 
-        except SQLAlchemyError:
+        except (SQLAlchemyError, psycopg2.OperationalError):
             BotLogging.BotLogger.error("Error updating user database")
         return invasion_number
 
@@ -503,13 +523,27 @@ class WatchedTreads:
                 return users_query
             else:
                 return False
-        except SQLAlchemyError:
+        except (SQLAlchemyError, psycopg2.OperationalError):
             BotLogging.BotLogger.error("Error querying user database")
+
+    def update_bot_reply_database(self, new_replies_to_bot):
+        for bot_reply in new_replies_to_bot:
+            session = BotDatabase.Session()
+            botreply_entry = BotDatabase.BotReplies(text=bot_reply.body, author=str(bot_reply.author),
+                                                    thread=bot_reply.permalink)
+            session.add(botreply_entry)
+            session.commit()
+            BotDatabase.Session.remove()
+            BotLogging.BotLogger.info("Bot Reply:" + bot_reply.body)
 
     def update(self):
         bot_comment_changed = False
 
-        new_invaders_list = self.check_for_new_invaders()
+        comments_in_thread = reddit_operations.get_comments_in_thread(url=self.thread_url)
+
+        self.update_bot_reply_database(self.check_for_bot_comment_replies(comments_in_thread))
+
+        new_invaders_list = self.check_for_new_invaders([str(x.author) for x in comments_in_thread])
 
         if new_invaders_list:
             self.bot_body = self.add_user_lines(srs_users=new_invaders_list)
@@ -519,50 +553,55 @@ class WatchedTreads:
 
         if self.last_parent_post_score is not current_parent_post_score:
             self.last_parent_post_score = current_parent_post_score
-            self.update_graph()
-            #bot_comment_changed = True
+            # self.update_graph()
+            # bot_comment_changed = True
 
         if bot_comment_changed:
-            reddit_operations.edit_comment(comment_id=self.bot_reply_object_id,
+            reddit_operations.edit_comment(comment_id=self.bot_reply_object_fullname,
                                            comment_body=self.bot_body,
                                            poster_username=self.poster_username)
 
         if self.check_if_expired():
-            BotLogging.BotLogger.info('This Thread has Expired and is Removed! {0} '.format(self.thread_url))
+            BotLogging.BotLogger.info('This Thread has Expired and is being Removed! {0} '.format(self.thread_url))
 
-    def check_for_new_invaders(self):
+    def check_for_new_invaders(self, authors_in_thread):
         karma_upper_limit = 5  # if poster has more than that amount of karma in the srs subreddit he is added
         srs_users = []
         new_user_counter = 0
 
-        for author in reddit_operations.get_authors_in_thread(url=self.thread_url):
-            if author not in self.already_processed_users:
+        for author in authors_in_thread:
+            if author not in self.already_processed_users and author not in botconfig.bot_auth_info['REDDIT_BOT_USERNAME']:
                 new_user_counter += 1
                 user_srs_karma_balance = reddit_operations.get_user_karma_balance(author=author,
                                                                                   in_subreddit=self.srs_subreddit)
 
                 if user_srs_karma_balance >= karma_upper_limit:
                     srs_users.append({'username': author, 'tag': '', 'karma': user_srs_karma_balance})
-                    invasion_number = WatchedTreads.update_user_database(username=author,
-                                                                         subreddit=self.srs_subreddit,
-                                                                         srs_karma=user_srs_karma_balance)
+                    invasion_number = WatchedThreads.update_user_database(username=author,
+                                                                          subreddit=self.srs_subreddit,
+                                                                          srs_karma=user_srs_karma_balance)
                     if invasion_number:
-                        srs_users[-1]['tag'] = int(round((math.log(invasion_number, 1.902) - 1.5))) * '☠'
+                        srs_users[-1]['tag'] = self.create_invader_tag(invasion_number)
 
                 self.already_processed_users.append(author)
-        BotLogging.BotLogger.info('Processed {0} new users for thread: {1} User LIST:'.format(new_user_counter, self.thread_url))
-        BotLogging.BotLogger.info([user['username'] + ':' + str(user['karma']) for user in srs_users])
+        BotLogging.BotLogger.info('Processed {0} new users for thread: {1}'.format(new_user_counter, self.thread_url))
+
+        if srs_users:
+            BotLogging.BotLogger.info([user['username'] + ':' + str(user['karma']) for user in srs_users])
         return srs_users
 
     def update_graph(self):
         pass
+
+    def create_invader_tag(self, invasion_number):
+        return int(round((math.log(invasion_number, 1.902) - 1.7))) * '☠'
 
     @staticmethod
     def update_all():
         BotLogging.BotLogger.info('Currently Watching {} threads.'.format(len(bot1.Watched_Threads)))
         for thread in bot1.Watched_Threads:
             thread.update()
-        WatchedTreads.savecache()
+        WatchedThreads.savecache()
 
     def add_user_lines(self, srs_users):
         split_mark = '\n\n-----\n'
@@ -577,15 +616,14 @@ class WatchedTreads:
         return splitted_comment[0] + srs_users_lines + split_mark + splitted_comment[1]
 
     def check_if_expired(self):
-            time_watched = time.time() - self.start_watch_time
-            BotLogging.BotLogger.info('{0} Watched for {1} hours'.format(self.thread_url, time_watched/60/60))
-            if time_watched > self.keep_alive:  # if older than 8 hours
-                bot1.Watched_Threads.remove(self)
-                return True
+        time_watched = time.time() - self.start_watch_time
+        BotLogging.BotLogger.info('{0} Watched for {1} hours'.format(self.thread_url, time_watched / 60 / 60))
+        if time_watched > self.keep_alive:  # if older than 8 hours
+            bot1.Watched_Threads.remove(self)
+            return True
 
 
 class MatchedSubmissions:
-
     matching_results = []
 
     def __init__(self, dsubmission, target):
@@ -661,12 +699,12 @@ class MatchedSubmissions:
 
             members_active = ['Members of {0} participating in this thread:'.format(brigade_subreddit_link)]
 
-            stars = ['★']
+            stars = ['★', '✯']
 
             explanations = ['This thread has been targeted by a *possible* downvote-brigade from **{0}**'
-                            .format(brigade_subreddit_link),
+                                .format(brigade_subreddit_link),
                             'The above post was just linked from **{0}** in a *possible* attempt to downvote it.'
-                            .format(brigade_subreddit_link)
+                                .format(brigade_subreddit_link)
                             ]
 
             lines = ['{0}\n\n'.format(choice(explanations)),
@@ -691,7 +729,7 @@ class MatchedSubmissions:
 
     def _brigade_tweet(self):
         if self.is_srs and self.keyword_matched:
-            self.msg_for_tweet = 'ATTENTION: possible reactionary brigade from /r/{1} regarding #{0}: {2} #reddit'\
+            self.msg_for_tweet = 'ATTENTION: possible reactionary brigade from /r/{1} regarding #{0}: {2} #reddit' \
                 .format(self.keyword_matched.replace(' ', '_'), self.args['dsubmission'].subreddit, self.link)
 
             return True
@@ -699,7 +737,6 @@ class MatchedSubmissions:
 
 
 class ReddBot:
-
     def __init__(self):
         self.first_run = True
         self.pulllimit = {'submissions': results_limit, 'comments': results_limit_comm}
@@ -710,7 +747,7 @@ class ReddBot:
         self.twitter = None
         self.placeholder_id = None  # this doesn't always work !? but it will lower the traffic to some extent
         self.mthread = None  # maintanence thead
-        self.Watched_Threads = botconfig.cache   # list of currently watched brigade threads
+        self.Watched_Threads = botconfig.cache  # list of currently watched brigade threads
 
     def start_bot(self):
         loop_counter = 0
@@ -729,8 +766,8 @@ class ReddBot:
             self.mthread = MaintThread(1, maint_thread_name)
 
         if not self.mthread.isAlive():
-                self.mthread = MaintThread(1, maint_thread_name)
-                self.mthread.start()
+            self.mthread = MaintThread(1, maint_thread_name)
+            self.mthread.start()
 
     def _mainlooper(self):
 
@@ -747,10 +784,10 @@ class ReddBot:
             self.permcounters[loop] += self.cont_num[loop]
 
         BotLogging.BotLogger.info('Sub:{0}, this run:{1}.'
-              'Comments:{2}, this run:{3}'
-              .format(self.permcounters['submissions'],
-                      self.cont_num['submissions'], self.permcounters['comments'],
-                      self.cont_num['comments']))
+                                  'Comments:{2}, this run:{3}'
+                                  .format(self.permcounters['submissions'],
+                                          self.cont_num['submissions'], self.permcounters['comments'],
+                                          self.cont_num['comments']))
 
         self.first_run = False
 
@@ -759,10 +796,10 @@ class ReddBot:
 
     def _calculate_pull_limit(self, lastpullnum, target):
         """this needs to be done better"""
-        add_more = {'submissions': 70, 'comments': 300}   # how many items above last pull number to pull next run
+        add_more = {'submissions': 70, 'comments': 300}  # how many items above last pull number to pull next run
 
         if lastpullnum == 0:
-            lastpullnum = results_limit / 2   # in case no new results are returned
+            lastpullnum = results_limit / 2  # in case no new results are returned
 
         if self.pulllimit[target] - lastpullnum == 0:
             self.pulllimit[target] *= 2
@@ -782,7 +819,7 @@ class ReddBot:
                 if submission.id not in self.processed_objects[target]:
                     new_submissions_list.append(submission)
                     self.processed_objects[target].append(submission.id)  # add to list of already processed submission
-                    self.cont_num[target] += 1   # count the number of submissions processed each run
+                    self.cont_num[target] += 1  # count the number of submissions processed each run
             if new_submissions_list:
                 self.placeholder_id = new_submissions_list[0].id
         except (praw.errors.APIException, exceptions.HTTPError, exceptions.ConnectionError):
@@ -811,29 +848,30 @@ class ReddBot:
                     targeted_submission = None
                 BotLogging.BotLogger.debug(result.url)
                 if targeted_submission:
-                        already_watched = False
-                        for thread in self.Watched_Threads:
+                    already_watched = False
+                    for thread in self.Watched_Threads:
 
-                            if thread.thread_url in result.url:
-                                already_watched = True
-                        if not already_watched:
-                            try:
-                                reply = reddit_operations.reply_to_url(msg=result.msg_for_reply,
-                                                                       result_url=result.url)
-                                thread = WatchedTreads(thread_url=result.url,
-                                                       srs_subreddit=str(result.args['dsubmission'].subreddit),
-                                                       srs_author=str(result.args['dsubmission'].author),
-                                                       bot_reply_object_id=reply.name,
-                                                       bot_reply_body=reply.body,
-                                                       poster_username=str(reply.author)
-                                                       )
-                                self.Watched_Threads.append(thread)
-                                WatchedTreads.savecache()
-                                #send_pm_to_owner("New Watch thread added by: {0} in: {1}".format(str(reply.author), result.url))
-                            except AttributeError:
-                                BotLogging.BotLogger.error("ALL USERS BANNED IN: {}".format(targeted_submission.subreddit))
-                        else:
-                            BotLogging.BotLogger.info("THREAD ALREADY WATCHED!")
+                        if thread.thread_url in result.url:
+                            already_watched = True
+                    if not already_watched:
+                        try:
+                            reply = reddit_operations.reply_to_url(msg=result.msg_for_reply,
+                                                                   result_url=result.url)
+                            thread = WatchedThreads(thread_url=result.url,
+                                                    srs_subreddit=str(result.args['dsubmission'].subreddit),
+                                                    srs_author=str(result.args['dsubmission'].author),
+                                                    bot_reply_object_fullname=reply.name,
+                                                    bot_reply_object_id=reply.id,
+                                                    bot_reply_body=reply.body,
+                                                    poster_username=str(reply.author),
+                                                    thread_permalink=targeted_submission.permalink
+                                                    )
+                            self.Watched_Threads.append(thread)
+                            WatchedThreads.savecache()
+                        except AttributeError:
+                            BotLogging.BotLogger.error("ALL USERS BANNED IN: {}".format(targeted_submission.subreddit))
+                    else:
+                        BotLogging.BotLogger.info("THREAD ALREADY WATCHED!")
 
             if result.msg_for_tweet:
                 reddit_operations.tweet_this(result.msg_for_tweet)
